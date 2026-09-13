@@ -17,8 +17,12 @@ Chevrere posee el catálogo maestro (`Category`, `GlobalProduct`). Las stores op
 - `GlobalProduct` y `Category` no tienen `TenantId`.
 - `StoreProduct` pertenece al tenant y se ancla con FK `(StoreId, TenantId) → Store(Id, TenantId)`.
 - Enable es idempotente: si ya está habilitado, se confirma el estado. Disable pone `IsEnabled = false` y no borra la fila.
+- Un comando de estado que solicita el estado actual (Enable ya enabled, Disable ya disabled, Activate ya active, Deactivate ya inactive) es success **sin** mutación: sin `UpdatedAt`, sin `AuditEvent`, sin `SaveChanges`.
+- `AuditEvent` = transición empresarial efectiva. Request logging (Serilog) ≠ auditoría.
 - Un producto inactivo o una categoría inactiva no es comercialmente disponible. No se desactivan en cascada las filas hijas.
 - Pricing, imágenes, impuestos e inventario quedan fuera.
+- `Update` de Category/GlobalProduct sigue siendo un comando de edición explícito (siempre persiste); no se implementó comparación campo-a-campo para no-op de PUT.
+- Slug es estable: no se regenera al actualizar el nombre.
 
 ## Consecuencias
 

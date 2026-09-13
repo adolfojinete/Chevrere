@@ -7,7 +7,7 @@ namespace Chevrere.UnitTests.Catalog;
 public sealed class CatalogDomainTests
 {
     [Fact]
-    public void Category_create_activate_and_deactivate()
+    public void Category_activate_and_deactivate_are_idempotent()
     {
         var category = Category.Create(
             CategoryCode.Create("BEBIDAS"),
@@ -18,14 +18,22 @@ public sealed class CatalogDomainTests
             FixedClock.Now);
 
         Assert.True(category.IsActive);
-        category.Deactivate(FixedClock.Now);
+        Assert.False(category.Activate(FixedClock.Now.AddMinutes(1)));
+        Assert.Equal(FixedClock.Now, category.UpdatedAt);
+
+        Assert.True(category.Deactivate(FixedClock.Now.AddMinutes(2)));
         Assert.Equal(CategoryStatus.Inactive, category.Status);
-        category.Activate(FixedClock.Now);
+        Assert.Equal(FixedClock.Now.AddMinutes(2), category.UpdatedAt);
+
+        Assert.False(category.Deactivate(FixedClock.Now.AddMinutes(3)));
+        Assert.Equal(FixedClock.Now.AddMinutes(2), category.UpdatedAt);
+
+        Assert.True(category.Activate(FixedClock.Now.AddMinutes(4)));
         Assert.True(category.IsActive);
     }
 
     [Fact]
-    public void Product_create_activate_and_deactivate()
+    public void Product_activate_and_deactivate_are_idempotent()
     {
         var category = Category.Create(CategoryCode.Create("BEB"), "Bebidas", Slug.FromName("bebidas"), null, 0, FixedClock.Now);
         var product = GlobalProduct.Create(
@@ -39,10 +47,15 @@ public sealed class CatalogDomainTests
             Barcode.Create("7701234567890"),
             FixedClock.Now);
 
-        Assert.True(product.IsActive);
-        product.Deactivate(FixedClock.Now);
+        Assert.False(product.Activate(FixedClock.Now.AddMinutes(1)));
+        Assert.Equal(FixedClock.Now, product.UpdatedAt);
+
+        Assert.True(product.Deactivate(FixedClock.Now.AddMinutes(2)));
         Assert.Equal(GlobalProductStatus.Inactive, product.Status);
-        product.Activate(FixedClock.Now);
+        Assert.False(product.Deactivate(FixedClock.Now.AddMinutes(3)));
+        Assert.Equal(FixedClock.Now.AddMinutes(2), product.UpdatedAt);
+
+        Assert.True(product.Activate(FixedClock.Now.AddMinutes(4)));
         Assert.True(product.IsActive);
     }
 
@@ -68,7 +81,7 @@ public sealed class CatalogDomainTests
     }
 
     [Fact]
-    public void Store_product_enable_disable_and_availability()
+    public void Store_product_enable_disable_are_idempotent()
     {
         var category = Category.Create(CategoryCode.Create("BEB"), "Bebidas", Slug.FromName("bebidas"), null, 0, FixedClock.Now);
         var product = GlobalProduct.Create(
@@ -86,13 +99,17 @@ public sealed class CatalogDomainTests
         var offering = StoreProduct.EnableForStore(tenantId, storeId, product, FixedClock.Now);
 
         Assert.True(offering.IsEnabled);
+        Assert.False(offering.Enable(product, FixedClock.Now.AddMinutes(1)));
+        Assert.Equal(FixedClock.Now, offering.UpdatedAt);
+
+        Assert.True(offering.Disable(FixedClock.Now.AddMinutes(2)));
+        Assert.False(offering.IsEnabled);
+        Assert.False(offering.Disable(FixedClock.Now.AddMinutes(3)));
+        Assert.Equal(FixedClock.Now.AddMinutes(2), offering.UpdatedAt);
+
+        Assert.True(offering.Enable(product, FixedClock.Now.AddMinutes(4)));
         Assert.True(CommercialAvailability.IsAvailable(category, product, offering));
 
-        offering.Disable(FixedClock.Now);
-        Assert.False(offering.IsEnabled);
-        Assert.False(CommercialAvailability.IsAvailable(category, product, offering));
-
-        offering.Enable(product, FixedClock.Now);
         category.Deactivate(FixedClock.Now);
         Assert.False(CommercialAvailability.IsAvailable(category, product, offering));
         Assert.False(CommercialAvailability.IsBrowsable(category, product));

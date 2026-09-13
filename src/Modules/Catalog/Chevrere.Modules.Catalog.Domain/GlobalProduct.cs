@@ -85,7 +85,8 @@ public sealed class GlobalProduct : AggregateRoot
         UpdatedAt = utcNow;
     }
 
-    public void Activate(DateTimeOffset utcNow)
+    /// <returns>true when the status actually changed.</returns>
+    public bool Activate(DateTimeOffset utcNow)
     {
         if (Status == GlobalProductStatus.Discontinued)
         {
@@ -94,11 +95,18 @@ public sealed class GlobalProduct : AggregateRoot
                 "A discontinued product cannot be activated.");
         }
 
+        if (Status == GlobalProductStatus.Active)
+        {
+            return false;
+        }
+
         Status = GlobalProductStatus.Active;
         UpdatedAt = utcNow;
+        return true;
     }
 
-    public void Deactivate(DateTimeOffset utcNow)
+    /// <returns>true when the status actually changed.</returns>
+    public bool Deactivate(DateTimeOffset utcNow)
     {
         if (Status == GlobalProductStatus.Discontinued)
         {
@@ -107,8 +115,14 @@ public sealed class GlobalProduct : AggregateRoot
                 "A discontinued product cannot be deactivated.");
         }
 
+        if (Status == GlobalProductStatus.Inactive)
+        {
+            return false;
+        }
+
         Status = GlobalProductStatus.Inactive;
         UpdatedAt = utcNow;
+        return true;
     }
 
     public void EnsureCanBeOffered()

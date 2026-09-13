@@ -108,8 +108,18 @@ public sealed class ActivateCategoryHandler(ICatalogStore store, IAuditRecorder 
         }
 
         var previous = category.Status;
-        category.Activate(clock.UtcNow);
-        audit.Record(AuditActions.CategoryActivated, nameof(Category), category.Id, null, previousValue: new { Status = previous }, newValue: new { category.Status });
+        if (!category.Activate(clock.UtcNow))
+        {
+            return Result.Success();
+        }
+
+        audit.Record(
+            AuditActions.CategoryActivated,
+            nameof(Category),
+            category.Id,
+            null,
+            previousValue: new { Status = previous },
+            newValue: new { category.Status });
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
@@ -129,8 +139,18 @@ public sealed class DeactivateCategoryHandler(ICatalogStore store, IAuditRecorde
         }
 
         var previous = category.Status;
-        category.Deactivate(clock.UtcNow);
-        audit.Record(AuditActions.CategoryDeactivated, nameof(Category), category.Id, null, previousValue: new { Status = previous }, newValue: new { category.Status });
+        if (!category.Deactivate(clock.UtcNow))
+        {
+            return Result.Success();
+        }
+
+        audit.Record(
+            AuditActions.CategoryDeactivated,
+            nameof(Category),
+            category.Id,
+            null,
+            previousValue: new { Status = previous },
+            newValue: new { category.Status });
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }

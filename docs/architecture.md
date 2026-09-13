@@ -186,7 +186,11 @@ Crear, activar, suspender y reactivar asociados, y mutar el catálogo global, ex
 
 Cada request recibe o genera un `X-Correlation-ID`. Se propaga a logs y a `audit_events`.
 
-Se registran creación de tenant, franchisee, store, owner, subscription, activación, suspensión, reactivación y cambio de plan. Los snapshots JSONB no incluyen contraseñas.
+Se registran creación de tenant, franchisee, store, owner, subscription, activación, suspensión, reactivación y cambio de plan; y mutaciones de Catalog (categoría, producto global, enable/disable de StoreProduct). Los snapshots JSONB no incluyen contraseñas.
+
+`AuditEvent` representa una **mutación empresarial real**, no cada llamada HTTP. Un comando idempotente que pide el estado actual (p. ej. Enable cuando ya está Enabled, Activate cuando ya está Active) responde success sin cambiar `UpdatedAt`, sin `SaveChanges` y sin nuevo evento de auditoría. Serilog puede seguir registrando el request; la auditoría no.
+
+`Category.Slug` y `GlobalProduct.Slug` son estables: un Update de nombre no los recalcula.
 
 ## Base de datos
 
