@@ -1,0 +1,22 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{json,yml,yaml,md}]
+indent_size = 2
+
+[*.cs]
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = true
+
+# DI constructors and primary constructors routinely exceed 7 parameters.
+dotnet_diagnostic.S107.severity = suggestion
+
+# Generated EF migrations are not production logic.
+dotnet_diagnostic.S1192.severity = warning

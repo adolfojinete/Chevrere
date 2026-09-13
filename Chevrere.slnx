@@ -1,0 +1,30 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Chevrere.Api/Chevrere.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/Chevrere.Infrastructure/Chevrere.Infrastructure.csproj" />
+    <Project Path="src/BuildingBlocks/Chevrere.SharedKernel/Chevrere.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Identity/">
+    <Project Path="src/Modules/Identity/Chevrere.Modules.Identity.Application/Chevrere.Modules.Identity.Application.csproj" />
+    <Project Path="src/Modules/Identity/Chevrere.Modules.Identity.Domain/Chevrere.Modules.Identity.Domain.csproj" />
+    <Project Path="src/Modules/Identity/Chevrere.Modules.Identity.Infrastructure/Chevrere.Modules.Identity.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Subscriptions/">
+    <Project Path="src/Modules/Subscriptions/Chevrere.Modules.Subscriptions.Application/Chevrere.Modules.Subscriptions.Application.csproj" />
+    <Project Path="src/Modules/Subscriptions/Chevrere.Modules.Subscriptions.Domain/Chevrere.Modules.Subscriptions.Domain.csproj" />
+    <Project Path="src/Modules/Subscriptions/Chevrere.Modules.Subscriptions.Infrastructure/Chevrere.Modules.Subscriptions.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Tenancy/">
+    <Project Path="src/Modules/Tenancy/Chevrere.Modules.Tenancy.Application/Chevrere.Modules.Tenancy.Application.csproj" />
+    <Project Path="src/Modules/Tenancy/Chevrere.Modules.Tenancy.Domain/Chevrere.Modules.Tenancy.Domain.csproj" />
+    <Project Path="src/Modules/Tenancy/Chevrere.Modules.Tenancy.Infrastructure/Chevrere.Modules.Tenancy.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Chevrere.ArchitectureTests/Chevrere.ArchitectureTests.csproj" />
+    <Project Path="tests/Chevrere.IntegrationTests/Chevrere.IntegrationTests.csproj" />
+    <Project Path="tests/Chevrere.UnitTests/Chevrere.UnitTests.csproj" />
+  </Folder>
+</Solution>

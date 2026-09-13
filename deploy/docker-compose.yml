@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: chevrere-postgres
+    environment:
+      POSTGRES_USER: chevrere
+      POSTGRES_PASSWORD: ${CHEVRERE_DB_PASSWORD:-chevrere_dev_only}
+      POSTGRES_DB: chevrere
+    ports:
+      - "${CHEVRERE_DB_PORT:-5432}:5432"
+    volumes:
+      - chevrere_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chevrere -d chevrere"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  chevrere_pgdata:

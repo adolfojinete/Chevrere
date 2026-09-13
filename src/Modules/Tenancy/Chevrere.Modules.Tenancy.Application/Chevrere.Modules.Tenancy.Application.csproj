@@ -1,0 +1,11 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Chevrere.Modules.Tenancy.Domain\Chevrere.Modules.Tenancy.Domain.csproj" />
+    <ProjectReference Include="..\..\Identity\Chevrere.Modules.Identity.Application\Chevrere.Modules.Identity.Application.csproj" />
+    <ProjectReference Include="..\..\Subscriptions\Chevrere.Modules.Subscriptions.Application\Chevrere.Modules.Subscriptions.Application.csproj" />
+  </ItemGroup>
+</Project>
