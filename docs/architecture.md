@@ -4,7 +4,7 @@
 
 Chevrere es una plataforma SaaS + quick-commerce basada en una red de dark stores independientes.
 
-Hacia el consumidor existe una sola marca y una sola aplicación. Internamente, múltiples operadores/asociados operan una o varias dark stores. El backend es único. Esta fase construye la administración central de asociados.
+Hacia el consumidor existe una sola marca y una sola aplicación. Internamente, múltiples operadores/asociados operan una o varias dark stores. El backend es único. Esta fase cubre la administración central de asociados y el catálogo comercial (global + por store).
 
 ```text
                        CHEVRERE
@@ -48,17 +48,44 @@ Motivo: el compile-time impide que Domain tome dependencias de EF, Identity o HT
 
 `Chevrere.Infrastructure` concentra el `DbContext` único, ASP.NET Identity y auditoría. Un solo contexto permite que el onboarding (`CreateFranchisee`) sea atómico: Tenant + Franchisee + Owner + Store + Subscription se confirman en la misma transacción.
 
-No hay repositorios genéricos. Cada módulo expone puertos de aplicación (`ITenancyStore`, `IIdentityProvisioning`, `ISubscriptionProvisioning`) implementados en su Infrastructure.
+No hay repositorios genéricos. Cada módulo expone puertos de aplicación (`ITenancyStore`, `IIdentityProvisioning`, `ISubscriptionProvisioning`, `ICatalogStore`) implementados en su Infrastructure.
 
-## Módulos iniciales
+## Módulos
 
 | Módulo | Responsabilidad |
 |---|---|
 | Identity | Usuarios, roles, JWT, bootstrap SuperAdmin, provisioning del Owner |
 | Tenancy | Tenant, Franchisee, Store, onboarding y ciclo de vida administrativo |
 | Subscriptions | Planes SaaS y suscripción del tenant. Distinto de pagos del consumidor |
+| Catalog | Catálogo global Chevrere y opt-in comercial por Store |
 
-Módulos futuros previstos, no implementados: Catalog, Pricing, Inventory, Orders, Payments, Billing, Operations, Notifications.
+Módulos futuros previstos, no implementados: Pricing, Inventory, Orders, Payments, Billing, Operations, Notifications.
+
+## Catálogo
+
+```text
+CHEVRERE
+   ↓
+Category (global)
+   ↓
+GlobalProduct (global, una presentación = un SKU)
+   ↓
+StoreProduct (tenant + store)
+   ↓
+Pricing / Inventory / Orders   ← futuro
+```
+
+`Category` y `GlobalProduct` **no** tienen `TenantId`. Son de la plataforma. `StoreProduct` **sí** pertenece a un tenant y referencia `Store (Id, TenantId)` con FK compuesta.
+
+Disponibilidad comercial efectiva (sin stock todavía):
+
+```text
+Category.Active AND GlobalProduct.Active AND StoreProduct.Enabled
+```
+
+Desactivar una categoría o un producto global no borra `StoreProduct`. Solo deja de ser comercialmente disponible. Una categoría inactiva no desactiva físicamente sus productos.
+
+No hay jerarquía de categorías en esta fase: evita ciclos y no hay caso de uso de árbol. `SortOrder` + nombre alcanzan. Cada presentación (250ml vs 1.5L) es un `GlobalProduct` distinto.
 
 ## Dependencias
 
@@ -67,11 +94,13 @@ flowchart TD
     Api[Chevrere.Api] --> IdentityInfra[Identity.Infrastructure]
     Api --> TenancyInfra[Tenancy.Infrastructure]
     Api --> SubsInfra[Subscriptions.Infrastructure]
+    Api --> CatalogInfra[Catalog.Infrastructure]
     Api --> SharedInfra[Chevrere.Infrastructure]
 
     IdentityInfra --> IdentityApp[Identity.Application]
     TenancyInfra --> TenancyApp[Tenancy.Application]
     SubsInfra --> SubsApp[Subscriptions.Application]
+    CatalogInfra --> CatalogApp[Catalog.Application]
 
     TenancyApp --> IdentityApp
     TenancyApp --> SubsApp
@@ -79,7 +108,9 @@ flowchart TD
     IdentityApp --> IdentityDomain[Identity.Domain]
     TenancyApp --> TenancyDomain[Tenancy.Domain]
     SubsApp --> SubsDomain[Subscriptions.Domain]
+    CatalogApp --> CatalogDomain[Catalog.Domain]
 
+    SharedInfra --> CatalogDomain
     SharedInfra --> TenancyDomain
     SharedInfra --> SubsDomain
     SharedInfra --> SharedKernel[SharedKernel]
@@ -101,7 +132,7 @@ User autenticado
   → Query filters de EF Core
 ```
 
-Filtros globales en `Tenant`, `Franchisee`, `Store`, `Subscription` y `AuditEvent`. Los usuarios de plataforma (`PlatformSuperAdmin`, `PlatformAdmin`, `PlatformSupport`) los omiten. Los endpoints `/api/v1/business/*` no aceptan `tenantId` del request.
+Filtros globales en `Tenant`, `Franchisee`, `Store`, `Subscription`, `AuditEvent` y `StoreProduct`. `Category` y `GlobalProduct` no se filtran por tenant. Los usuarios de plataforma (`PlatformSuperAdmin`, `PlatformAdmin`, `PlatformSupport`) omiten los filtros. Los endpoints `/api/v1/business/*` no aceptan `tenantId` del request. Una Store ajena responde 404.
 
 `User.TenantId` nulo identifica personal de plataforma. Un Owner siempre nace ligado al tenant creado.
 
@@ -149,7 +180,7 @@ Policies:
 | PlatformSuperAdmin | SuperAdmin |
 | FranchiseeOwner | Owner del asociado |
 
-Crear, activar, suspender y reactivar asociados exige `PlatformOperators`.
+Crear, activar, suspender y reactivar asociados, y mutar el catálogo global, exige `PlatformOperators`. `PlatformSupport` puede leer el catálogo, no escribirlo. El Owner habilita/deshabilita productos solo en stores de su tenant.
 
 ## Auditoría y correlación
 

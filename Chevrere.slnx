@@ -7,6 +7,11 @@
     <Project Path="src/BuildingBlocks/Chevrere.SharedKernel/Chevrere.SharedKernel.csproj" />
   </Folder>
   <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Catalog/">
+    <Project Path="src/Modules/Catalog/Chevrere.Modules.Catalog.Application/Chevrere.Modules.Catalog.Application.csproj" />
+    <Project Path="src/Modules/Catalog/Chevrere.Modules.Catalog.Domain/Chevrere.Modules.Catalog.Domain.csproj" />
+    <Project Path="src/Modules/Catalog/Chevrere.Modules.Catalog.Infrastructure/Chevrere.Modules.Catalog.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Identity/">
     <Project Path="src/Modules/Identity/Chevrere.Modules.Identity.Application/Chevrere.Modules.Identity.Application.csproj" />
     <Project Path="src/Modules/Identity/Chevrere.Modules.Identity.Domain/Chevrere.Modules.Identity.Domain.csproj" />

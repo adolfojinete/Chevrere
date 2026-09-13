@@ -6,6 +6,7 @@ using Chevrere.Infrastructure;
 using Chevrere.Infrastructure.Options;
 using Chevrere.Infrastructure.Persistence;
 using Chevrere.Infrastructure.Seed;
+using Chevrere.Modules.Catalog.Infrastructure;
 using Chevrere.Modules.Identity.Infrastructure;
 using Chevrere.Modules.Subscriptions.Infrastructure;
 using Chevrere.Modules.Tenancy.Infrastructure;
@@ -46,7 +47,7 @@ try
         {
             Title = "Chevrere API",
             Version = "v1",
-            Description = "Administración central de asociados, tenants, stores y suscripciones SaaS."
+            Description = "Administración central de asociados, catálogo global y catálogo comercial por dark store."
         });
         options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
@@ -73,6 +74,7 @@ try
     builder.Services.AddIdentityModule();
     builder.Services.AddTenancyModule();
     builder.Services.AddSubscriptionsModule();
+    builder.Services.AddCatalogModule();
 
     var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
         ?? throw new InvalidOperationException("Jwt configuration is missing.");

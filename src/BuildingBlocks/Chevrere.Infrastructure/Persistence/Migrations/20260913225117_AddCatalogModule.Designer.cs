@@ -3,6 +3,7 @@ using System;
 using Chevrere.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Chevrere.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ChevrereDbContext))]
-    partial class ChevrereDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260913225117_AddCatalogModule")]
+    partial class AddCatalogModule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -2,7 +2,7 @@
 
 Plataforma SaaS + quick-commerce sobre una red de dark stores independientes.
 
-Esta fase entrega la fundación técnica y la administración central de asociados: onboarding atómico de Tenant, Franchisee, Owner, primera Store, Plan y Subscription; ciclo de vida (activar, suspender, reactivar) sin borrar datos; auditoría; multi-tenancy; y autenticación de plataforma.
+Esta fase entrega la fundación técnica, la administración central de asociados y el catálogo comercial: onboarding atómico de Tenant, Franchisee, Owner, primera Store, Plan y Subscription; ciclo de vida (activar, suspender, reactivar) sin borrar datos; catálogo global Chevrere y habilitación por dark store; auditoría; multi-tenancy; y autenticación de plataforma.
 
 ## Objetivo
 
@@ -22,7 +22,8 @@ Chevrere
 │   └── Modules
 │       ├── Identity     (Domain / Application / Infrastructure)
 │       ├── Tenancy      (Domain / Application / Infrastructure)
-│       └── Subscriptions(Domain / Application / Infrastructure)
+│       ├── Subscriptions(Domain / Application / Infrastructure)
+│       └── Catalog      (Domain / Application / Infrastructure)
 ├── tests
 │   ├── Chevrere.UnitTests
 │   ├── Chevrere.IntegrationTests
@@ -137,6 +138,9 @@ dotnet run --project src\Chevrere.Api
 7. `POST /api/v1/admin/franchisees/{id}/suspend`
 8. `POST /api/v1/admin/franchisees/{id}/reactivate`
 9. `GET /api/v1/admin/audit-events`
+10. `POST /api/v1/admin/categories` y `POST /api/v1/admin/products`
+11. Login Owner → `GET /api/v1/business/catalog/products`
+12. `POST /api/v1/business/stores/{storeId}/products/{productId}/enable`
 
 ## Tests
 
@@ -179,3 +183,4 @@ La solución incluye `SonarAnalyzer.CSharp` (el mismo motor de reglas que SonarQ
 - [docs/adr/ADR-002-postgresql.md](docs/adr/ADR-002-postgresql.md)
 - [docs/adr/ADR-003-multitenancy.md](docs/adr/ADR-003-multitenancy.md)
 - [docs/adr/ADR-004-identity.md](docs/adr/ADR-004-identity.md)
+- [docs/adr/ADR-005-global-catalog-store-catalog.md](docs/adr/ADR-005-global-catalog-store-catalog.md)
