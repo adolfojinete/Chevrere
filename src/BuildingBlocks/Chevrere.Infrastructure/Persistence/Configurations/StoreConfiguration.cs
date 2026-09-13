@@ -18,7 +18,6 @@ public sealed class StoreConfiguration : IEntityTypeConfiguration<Store>
         builder.Property(x => x.Longitude).HasPrecision(9, 6);
 
         builder.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
-        builder.HasIndex(x => x.FranchiseeId);
         builder.HasIndex(x => x.Status);
 
         builder.HasOne<Tenant>()
@@ -28,7 +27,8 @@ public sealed class StoreConfiguration : IEntityTypeConfiguration<Store>
 
         builder.HasOne<Franchisee>()
             .WithMany()
-            .HasForeignKey(x => x.FranchiseeId)
+            .HasForeignKey(x => new { x.FranchiseeId, x.TenantId })
+            .HasPrincipalKey(x => new { x.Id, x.TenantId })
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
