@@ -24,6 +24,7 @@ public sealed class FranchiseeConfiguration : IEntityTypeConfiguration<Franchise
         builder.HasIndex(x => x.Status);
         builder.HasIndex(x => x.TenantId);
         builder.HasIndex(x => new { x.TradeName, x.LegalName });
+        builder.HasAlternateKey(x => new { x.Id, x.TenantId });
 
         builder.HasOne<Tenant>()
             .WithMany()
