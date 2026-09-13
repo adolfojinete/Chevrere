@@ -56,14 +56,17 @@ public sealed class EnableStoreProductHandler(
         try
         {
             var existing = await store.GetStoreProductAsync(request.StoreId, product.Id, cancellationToken);
+            var created = false;
+
             if (existing is null)
             {
                 existing = StoreProduct.EnableForStore(tenantId, request.StoreId, product, clock.UtcNow);
                 store.AddStoreProduct(existing);
+                created = true;
             }
-            else if (!existing.IsEnabled)
+            else if (!existing.Enable(product, clock.UtcNow))
             {
-                existing.Enable(product, clock.UtcNow);
+                return Result.Success(ToDto(existing, product, category));
             }
 
             audit.Record(
@@ -71,27 +74,52 @@ public sealed class EnableStoreProductHandler(
                 nameof(StoreProduct),
                 existing.Id,
                 tenantId,
-                newValue: new { existing.StoreId, existing.GlobalProductId, existing.IsEnabled });
-            await unitOfWork.SaveChangesAsync(cancellationToken);
+                previousValue: created ? null : new { IsEnabled = false },
+                newValue: created
+                    ? new { existing.StoreId, existing.GlobalProductId, IsEnabled = true }
+                    : new { IsEnabled = true });
 
-            return Result.Success(new StoreProductDto(
-                existing.Id,
-                existing.StoreId,
-                existing.GlobalProductId,
-                product.Sku,
-                product.Name,
-                product.Brand,
-                product.Presentation,
-                category.Name,
-                existing.IsEnabled,
-                CommercialAvailability.IsAvailable(category, product, existing),
-                existing.UpdatedAt));
+            try
+            {
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+            }
+            catch (DuplicateKeyException) when (created)
+            {
+                // Concurrent Enable: another request inserted the same (StoreId, GlobalProductId).
+                // Discard only this failed attempt (StoreProduct + its AuditEvent), then reload winner.
+                store.DiscardTracked(existing);
+                audit.DiscardPending(AuditActions.StoreProductEnabled, nameof(StoreProduct), existing.Id);
+
+                var winner = await store.GetStoreProductAsync(request.StoreId, product.Id, cancellationToken);
+                if (winner is null || !winner.IsEnabled)
+                {
+                    throw;
+                }
+
+                return Result.Success(ToDto(winner, product, category));
+            }
+
+            return Result.Success(ToDto(existing, product, category));
         }
         catch (DomainException ex)
         {
             return Result.Failure<StoreProductDto>(Error.Domain(ex.Code, ex.Message));
         }
     }
+
+    private static StoreProductDto ToDto(StoreProduct offering, GlobalProduct product, Category category) =>
+        new(
+            offering.Id,
+            offering.StoreId,
+            offering.GlobalProductId,
+            product.Sku,
+            product.Name,
+            product.Brand,
+            product.Presentation,
+            category.Name,
+            offering.IsEnabled,
+            CommercialAvailability.IsAvailable(category, product, offering),
+            offering.UpdatedAt);
 }
 
 public sealed class DisableStoreProductHandler(
@@ -122,19 +150,19 @@ public sealed class DisableStoreProductHandler(
             return Result.Failure(Error.NotFound(ErrorCodes.NotFound, "Store product not found."));
         }
 
-        if (existing.IsEnabled)
+        if (!existing.Disable(clock.UtcNow))
         {
-            existing.Disable(clock.UtcNow);
-            audit.Record(
-                AuditActions.StoreProductDisabled,
-                nameof(StoreProduct),
-                existing.Id,
-                tenantId,
-                previousValue: new { IsEnabled = true },
-                newValue: new { existing.IsEnabled });
-            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return Result.Success();
         }
 
+        audit.Record(
+            AuditActions.StoreProductDisabled,
+            nameof(StoreProduct),
+            existing.Id,
+            tenantId,
+            previousValue: new { IsEnabled = true },
+            newValue: new { IsEnabled = false });
+        await unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
     }
 }

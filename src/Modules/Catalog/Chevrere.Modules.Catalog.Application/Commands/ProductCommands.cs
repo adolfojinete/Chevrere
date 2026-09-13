@@ -185,7 +185,10 @@ public sealed class ActivateGlobalProductHandler(ICatalogStore store, IAuditReco
         var previous = product.Status;
         try
         {
-            product.Activate(clock.UtcNow);
+            if (!product.Activate(clock.UtcNow))
+            {
+                return Result.Success();
+            }
         }
         catch (DomainException ex)
         {
@@ -214,7 +217,10 @@ public sealed class DeactivateGlobalProductHandler(ICatalogStore store, IAuditRe
         var previous = product.Status;
         try
         {
-            product.Deactivate(clock.UtcNow);
+            if (!product.Deactivate(clock.UtcNow))
+            {
+                return Result.Success();
+            }
         }
         catch (DomainException ex)
         {

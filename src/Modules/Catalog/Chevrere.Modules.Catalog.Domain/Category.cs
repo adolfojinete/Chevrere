@@ -59,16 +59,30 @@ public sealed class Category : AggregateRoot
         UpdatedAt = utcNow;
     }
 
-    public void Activate(DateTimeOffset utcNow)
+    /// <returns>true when the status actually changed.</returns>
+    public bool Activate(DateTimeOffset utcNow)
     {
+        if (Status == CategoryStatus.Active)
+        {
+            return false;
+        }
+
         Status = CategoryStatus.Active;
         UpdatedAt = utcNow;
+        return true;
     }
 
-    public void Deactivate(DateTimeOffset utcNow)
+    /// <returns>true when the status actually changed.</returns>
+    public bool Deactivate(DateTimeOffset utcNow)
     {
+        if (Status == CategoryStatus.Inactive)
+        {
+            return false;
+        }
+
         Status = CategoryStatus.Inactive;
         UpdatedAt = utcNow;
+        return true;
     }
 
     private static string? NormalizeOptional(string? value, int maxLength)

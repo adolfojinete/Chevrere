@@ -48,7 +48,8 @@ public sealed class StoreProduct : AggregateRoot
         };
     }
 
-    public void Enable(GlobalProduct product, DateTimeOffset utcNow)
+    /// <returns>true when IsEnabled actually changed to true.</returns>
+    public bool Enable(GlobalProduct product, DateTimeOffset utcNow)
     {
         ArgumentNullException.ThrowIfNull(product);
         if (product.Id != GlobalProductId)
@@ -57,14 +58,28 @@ public sealed class StoreProduct : AggregateRoot
         }
 
         product.EnsureCanBeOffered();
+
+        if (IsEnabled)
+        {
+            return false;
+        }
+
         IsEnabled = true;
         UpdatedAt = utcNow;
+        return true;
     }
 
-    public void Disable(DateTimeOffset utcNow)
+    /// <returns>true when IsEnabled actually changed to false.</returns>
+    public bool Disable(DateTimeOffset utcNow)
     {
+        if (!IsEnabled)
+        {
+            return false;
+        }
+
         IsEnabled = false;
         UpdatedAt = utcNow;
+        return true;
     }
 
     public bool BelongsTo(Guid tenantId, Guid storeId) =>
