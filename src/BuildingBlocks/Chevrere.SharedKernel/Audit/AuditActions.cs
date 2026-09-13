@@ -13,4 +13,14 @@ public static class AuditActions
     public const string SubscriptionSuspended = "subscription.suspended";
     public const string SubscriptionReactivated = "subscription.reactivated";
     public const string PlanChanged = "subscription.plan_changed";
+    public const string CategoryCreated = "category.created";
+    public const string CategoryUpdated = "category.updated";
+    public const string CategoryActivated = "category.activated";
+    public const string CategoryDeactivated = "category.deactivated";
+    public const string GlobalProductCreated = "global_product.created";
+    public const string GlobalProductUpdated = "global_product.updated";
+    public const string GlobalProductActivated = "global_product.activated";
+    public const string GlobalProductDeactivated = "global_product.deactivated";
+    public const string StoreProductEnabled = "store_product.enabled";
+    public const string StoreProductDisabled = "store_product.disabled";
 }

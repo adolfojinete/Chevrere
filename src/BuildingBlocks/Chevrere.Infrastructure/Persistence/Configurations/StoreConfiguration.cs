@@ -19,6 +19,7 @@ public sealed class StoreConfiguration : IEntityTypeConfiguration<Store>
 
         builder.HasIndex(x => new { x.TenantId, x.Code }).IsUnique();
         builder.HasIndex(x => x.Status);
+        builder.HasAlternateKey(x => new { x.Id, x.TenantId });
 
         builder.HasOne<Tenant>()
             .WithMany()
