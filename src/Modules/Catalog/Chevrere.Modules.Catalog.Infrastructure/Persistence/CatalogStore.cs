@@ -32,6 +32,15 @@ public sealed class CatalogStore(ChevrereDbContext dbContext) : ICatalogStore
 
     public void AddStoreProduct(StoreProduct storeProduct) => dbContext.StoreProducts.Add(storeProduct);
 
+    public void DiscardTracked(StoreProduct storeProduct)
+    {
+        var entry = dbContext.Entry(storeProduct);
+        if (entry.State != EntityState.Detached)
+        {
+            entry.State = EntityState.Detached;
+        }
+    }
+
     public Task<Category?> GetCategoryAsync(Guid id, CancellationToken cancellationToken) =>
         dbContext.Categories.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
 

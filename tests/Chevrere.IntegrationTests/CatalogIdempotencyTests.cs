@@ -116,6 +116,44 @@ public sealed class CatalogIdempotencyTests(ChevrereApiFactory factory)
     }
 
     [Fact]
+    public async Task Concurrent_enable_requests_produce_single_store_product_and_single_audit()
+    {
+        using var admin = await AuthHelper.AuthenticatedAdminAsync(factory);
+        var category = await CatalogAdminTests.CreateCategoryAsync(admin, "BEB-CON", "Bebidas Concurrent");
+        var product = await CatalogAdminTests.CreateProductAsync(
+            admin,
+            category.Id,
+            "SKU-CON-1",
+            "Producto Concurrent",
+            "7708888888881");
+        var franchisee = await CreateFranchiseeAsync(admin, "CON1", "owner-con1@example.com", "918888001");
+
+        using var ownerA = await OwnerClientAsync("owner-con1@example.com");
+        using var ownerB = await OwnerClientAsync("owner-con1@example.com");
+        var url = $"/api/v1/business/stores/{franchisee.StoreId}/products/{product.Id}/enable";
+
+        var firstTask = ownerA.PostAsync(url, null);
+        var secondTask = ownerB.PostAsync(url, null);
+        var responses = await Task.WhenAll(firstTask, secondTask);
+        var first = responses[0];
+        var second = responses[1];
+
+        Assert.True(first.IsSuccessStatusCode, await first.Content.ReadAsStringAsync());
+        Assert.True(second.IsSuccessStatusCode, await second.Content.ReadAsStringAsync());
+
+        var dtoA = await first.Content.ReadFromJsonAsync<StoreProductDto>(AuthHelper.Json);
+        var dtoB = await second.Content.ReadFromJsonAsync<StoreProductDto>(AuthHelper.Json);
+        Assert.NotNull(dtoA);
+        Assert.NotNull(dtoB);
+        Assert.Equal(dtoA.Id, dtoB.Id);
+        Assert.True(dtoA.IsEnabled);
+        Assert.True(dtoB.IsEnabled);
+
+        Assert.Equal(1, await CountStoreProductsAsync(franchisee.StoreId, product.Id));
+        Assert.Equal(1, await CountAuditsAsync(AuditActions.StoreProductEnabled, dtoA.Id));
+    }
+
+    [Fact]
     public async Task Platform_support_can_read_catalog_but_cannot_write()
     {
         await EnsureSupportUserAsync();

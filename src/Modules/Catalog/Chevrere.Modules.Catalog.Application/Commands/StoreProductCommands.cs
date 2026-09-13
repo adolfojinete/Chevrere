@@ -83,10 +83,15 @@ public sealed class EnableStoreProductHandler(
             {
                 await unitOfWork.SaveChangesAsync(cancellationToken);
             }
-            catch (DuplicateKeyException)
+            catch (DuplicateKeyException) when (created)
             {
+                // Concurrent Enable: another request inserted the same (StoreId, GlobalProductId).
+                // Discard only this failed attempt (StoreProduct + its AuditEvent), then reload winner.
+                store.DiscardTracked(existing);
+                audit.DiscardPending(AuditActions.StoreProductEnabled, nameof(StoreProduct), existing.Id);
+
                 var winner = await store.GetStoreProductAsync(request.StoreId, product.Id, cancellationToken);
-                if (winner is null)
+                if (winner is null || !winner.IsEnabled)
                 {
                     throw;
                 }

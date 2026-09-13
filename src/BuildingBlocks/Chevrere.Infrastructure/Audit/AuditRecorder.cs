@@ -3,6 +3,7 @@ using Chevrere.Infrastructure.Persistence;
 using Chevrere.SharedKernel.Audit;
 using Chevrere.SharedKernel.Context;
 using Chevrere.SharedKernel.Time;
+using Microsoft.EntityFrameworkCore;
 
 namespace Chevrere.Infrastructure.Audit;
 
@@ -35,6 +36,19 @@ public sealed class AuditRecorder(
             PreviousValue = Serialize(previousValue),
             NewValue = Serialize(newValue)
         });
+    }
+
+    public void DiscardPending(string action, string entityType, Guid entityId)
+    {
+        foreach (var entry in dbContext.ChangeTracker.Entries<AuditEvent>()
+                     .Where(e => e.State == EntityState.Added
+                                 && e.Entity.Action == action
+                                 && e.Entity.EntityType == entityType
+                                 && e.Entity.EntityId == entityId)
+                     .ToList())
+        {
+            entry.State = EntityState.Detached;
+        }
     }
 
     private string SafeCorrelationId()

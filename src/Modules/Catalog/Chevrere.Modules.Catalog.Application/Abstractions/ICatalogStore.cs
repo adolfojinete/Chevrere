@@ -22,6 +22,11 @@ public interface ICatalogStore
 
     void AddStoreProduct(StoreProduct storeProduct);
 
+    /// <summary>
+    /// Detaches a tracked StoreProduct after a failed insert so the winner can be reloaded.
+    /// </summary>
+    void DiscardTracked(StoreProduct storeProduct);
+
     Task<Category?> GetCategoryAsync(Guid id, CancellationToken cancellationToken);
 
     Task<GlobalProduct?> GetProductAsync(Guid id, CancellationToken cancellationToken);

@@ -2,7 +2,7 @@ namespace Chevrere.SharedKernel.Persistence;
 
 /// <summary>
 /// Raised when a unique constraint prevents inserting a duplicate row.
-/// Callers of idempotent creates may treat this as a recoverable race.
+/// Infrastructure only translates the persistence error; callers decide recovery.
 /// </summary>
 public sealed class DuplicateKeyException : Exception
 {

@@ -19,18 +19,8 @@ public sealed class EfUnitOfWork(ChevrereDbContext dbContext) : IUnitOfWork
         }
         catch (DbUpdateException ex) when (IsUniqueViolation(ex))
         {
-            DetachPendingChanges();
+            // Translate only. Do not mutate ChangeTracker: recovery belongs to the use case.
             throw new DuplicateKeyException("A unique constraint was violated.", ex);
-        }
-    }
-
-    private void DetachPendingChanges()
-    {
-        foreach (var entry in dbContext.ChangeTracker.Entries()
-                     .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
-                     .ToList())
-        {
-            entry.State = EntityState.Detached;
         }
     }
 
