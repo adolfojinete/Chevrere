@@ -88,6 +88,10 @@ internal static class ConsumerTestData
             $"/api/v1/business/stores/{storeId}/products/{productId}/price",
             new SetPriceRequest(amount, "COP"))).EnsureSuccessStatusCode();
 
+    public static async Task RemoveStorePriceAsync(HttpClient owner, Guid storeId, Guid productId) =>
+        (await owner.DeleteAsync($"/api/v1/business/stores/{storeId}/products/{productId}/price"))
+            .EnsureSuccessStatusCode();
+
     public static async Task InitializeStockAsync(
         HttpClient owner,
         Guid storeId,

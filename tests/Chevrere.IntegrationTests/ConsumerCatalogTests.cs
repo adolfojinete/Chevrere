@@ -104,6 +104,11 @@ public sealed class ConsumerCatalogTests(ChevrereApiFactory factory)
         Assert.Equal("COP", global.Currency);
         Assert.Equal(6500m, store2.Price);
         Assert.Equal("COP", store2.Currency);
+        Assert.All(catalog.Items, i =>
+        {
+            Assert.True(i.Price > 0m);
+            Assert.False(string.IsNullOrWhiteSpace(i.Currency));
+        });
     }
 
     [Fact]

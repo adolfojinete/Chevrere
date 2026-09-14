@@ -106,7 +106,7 @@ Disponibilidad comercial hacia consumidor (implementada en Consumer Discovery):
 Category.Active
 AND GlobalProduct.Active
 AND StoreProduct.Enabled
-AND EffectivePrice != null          -- COALESCE(store override, suggested); ValidTo IS NULL
+AND EffectivePrice != null          -- misma query SQL: LEFT JOIN override vigente, else suggested vigente; ValidTo IS NULL
 AND Inventory (OnHand - Reserved) > 0
 AND Tenant.Active AND Store.Active
 AND StoreServiceArea.IsEnabled y el punto del consumidor dentro del radio (PostGIS)

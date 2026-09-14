@@ -63,6 +63,8 @@ AND existe InventoryItem con (OnHand - Reserved) > 0
 AND moneda COP vía el precio vigente
 ```
 
+EffectivePrice es parte de esa visibilidad, no un enrichment posterior: count, página, categorías y detalle proyectan monto y moneda desde la misma composición SQL (LEFT JOIN de precios vigentes). Un producto sin precio vigente no existe para el catálogo; nunca se inventa `0` ni moneda vacía. Amount y Currency salen de la misma fila ganadora (override o suggested).
+
 El DTO de lista/detalle expone `Id` = `GlobalProductId`, SKU, nombre, marca, presentación, descripción, categoría, precio y moneda. **Nunca** store/tenant ids, lat/lon, stock, distancia ni dirección.
 
 ### Superficies HTTP

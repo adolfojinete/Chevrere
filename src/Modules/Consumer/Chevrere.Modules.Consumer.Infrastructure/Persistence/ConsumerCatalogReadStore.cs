@@ -19,41 +19,26 @@ public sealed class ConsumerCatalogReadStore(ChevrereDbContext dbContext) : ICon
         ArgumentNullException.ThrowIfNull(store);
 
         var searchTerm = string.IsNullOrWhiteSpace(search) ? null : $"%{search.Trim()}%";
-        var query = CandidateQuery(store, searchTerm, categoryId);
+        var query = CommercialProductsQuery(store, searchTerm, categoryId);
 
         var total = await query.CountAsync(cancellationToken);
-        var pageRows = await query
+        var items = await query
             .OrderBy(x => x.Name)
             .ThenBy(x => x.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Select(x => new ConsumerProductListItemDto(
+                x.Id,
+                x.Sku,
+                x.Name,
+                x.Brand,
+                x.Presentation,
+                x.Description,
+                x.CategoryId,
+                x.CategoryName,
+                x.EffectiveAmount,
+                x.EffectiveCurrency))
             .ToListAsync(cancellationToken);
-
-        if (pageRows.Count == 0)
-        {
-            return ([], total);
-        }
-
-        var productIds = pageRows.Select(x => x.Id).ToList();
-        var prices = await LoadEffectivePricesAsync(store, productIds, cancellationToken);
-
-        var items = pageRows
-            .Select(x =>
-            {
-                var (amount, currency) = prices[x.Id];
-                return new ConsumerProductListItemDto(
-                    x.Id,
-                    x.Sku,
-                    x.Name,
-                    x.Brand,
-                    x.Presentation,
-                    x.Description,
-                    x.CategoryId,
-                    x.CategoryName,
-                    amount,
-                    currency);
-            })
-            .ToList();
 
         return (items, total);
     }
@@ -64,7 +49,7 @@ public sealed class ConsumerCatalogReadStore(ChevrereDbContext dbContext) : ICon
     {
         ArgumentNullException.ThrowIfNull(store);
 
-        var rows = await CandidateQuery(store, searchTerm: null, categoryId: null)
+        var rows = await CommercialProductsQuery(store, searchTerm: null, categoryId: null)
             .Select(x => new { x.CategoryId, x.CategoryName, x.CategorySlug })
             .Distinct()
             .OrderBy(x => x.CategoryName)
@@ -82,35 +67,29 @@ public sealed class ConsumerCatalogReadStore(ChevrereDbContext dbContext) : ICon
     {
         ArgumentNullException.ThrowIfNull(store);
 
-        var row = await CandidateQuery(store, searchTerm: null, categoryId: null)
+        return await CommercialProductsQuery(store, searchTerm: null, categoryId: null)
             .Where(x => x.Id == globalProductId)
+            .Select(x => new ConsumerProductDetailDto(
+                x.Id,
+                x.Sku,
+                x.Name,
+                x.Brand,
+                x.Presentation,
+                x.Description,
+                x.CategoryId,
+                x.CategoryName,
+                x.EffectiveAmount,
+                x.EffectiveCurrency))
             .FirstOrDefaultAsync(cancellationToken);
-
-        if (row is null)
-        {
-            return null;
-        }
-
-        var prices = await LoadEffectivePricesAsync(store, [row.Id], cancellationToken);
-        var (amount, currency) = prices[row.Id];
-        return new ConsumerProductDetailDto(
-            row.Id,
-            row.Sku,
-            row.Name,
-            row.Brand,
-            row.Presentation,
-            row.Description,
-            row.CategoryId,
-            row.CategoryName,
-            amount,
-            currency);
     }
 
     /// <summary>
-    /// Commercial gates on entity columns (so ILIKE/category filters translate), then a flat
-    /// projection. Prices load in a second batched round-trip for the page only.
+    /// Commercial query resolves current effective price and stock visibility server-side.
+    /// Count, page, categories and product detail all share this definition: a product is visible
+    /// only when Catalog, Inventory and a current EffectivePrice (store override else global
+    /// suggested) hold in the same SQL composition. There is no later price lookup.
     /// </summary>
-    private IQueryable<CandidateRow> CandidateQuery(
+    private IQueryable<CommercialProductRow> CommercialProductsQuery(
         ConsumerFulfillmentStore store,
         string? searchTerm,
         Guid? categoryId)
@@ -118,32 +97,38 @@ public sealed class ConsumerCatalogReadStore(ChevrereDbContext dbContext) : ICon
         var tenantId = store.TenantId;
         var storeId = store.StoreId;
 
-        var products =
+        var currentStorePrices = dbContext.StoreProductPrices.AsNoTracking().IgnoreQueryFilters()
+            .Where(p => p.TenantId == tenantId && p.StoreId == storeId && p.ValidTo == null);
+
+        var currentGlobalPrices = dbContext.GlobalProductPrices.AsNoTracking()
+            .Where(p => p.ValidTo == null);
+
+        return
             from offering in dbContext.StoreProducts.AsNoTracking().IgnoreQueryFilters()
             join product in dbContext.GlobalProducts.AsNoTracking() on offering.GlobalProductId equals product.Id
             join category in dbContext.Categories.AsNoTracking() on product.CategoryId equals category.Id
             join inventory in dbContext.InventoryItems.AsNoTracking().IgnoreQueryFilters()
                 on new { offering.TenantId, offering.StoreId, offering.GlobalProductId }
                 equals new { inventory.TenantId, inventory.StoreId, inventory.GlobalProductId }
+            join storePrice in currentStorePrices
+                on product.Id equals storePrice.GlobalProductId into storePriceGroup
+            from storePrice in storePriceGroup.DefaultIfEmpty()
+            join globalPrice in currentGlobalPrices
+                on product.Id equals globalPrice.GlobalProductId into globalPriceGroup
+            from globalPrice in globalPriceGroup.DefaultIfEmpty()
             where offering.TenantId == tenantId
                 && offering.StoreId == storeId
                 && offering.IsEnabled
                 && product.Status == GlobalProductStatus.Active
                 && category.Status == CategoryStatus.Active
                 && inventory.OnHand - inventory.Reserved > 0
-                && (dbContext.StoreProductPrices.IgnoreQueryFilters().Any(p =>
-                        p.TenantId == tenantId
-                        && p.StoreId == storeId
-                        && p.GlobalProductId == product.Id
-                        && p.ValidTo == null)
-                    || dbContext.GlobalProductPrices.Any(p =>
-                        p.GlobalProductId == product.Id && p.ValidTo == null))
+                && (storePrice != null || globalPrice != null)
                 && (categoryId == null || category.Id == categoryId)
                 && (searchTerm == null
                     || EF.Functions.ILike(product.Name, searchTerm)
                     || EF.Functions.ILike(product.Sku, searchTerm)
                     || EF.Functions.ILike(product.Brand, searchTerm))
-            select new CandidateRow
+            select new CommercialProductRow
             {
                 Id = product.Id,
                 Sku = product.Sku,
@@ -153,54 +138,13 @@ public sealed class ConsumerCatalogReadStore(ChevrereDbContext dbContext) : ICon
                 Description = product.Description,
                 CategoryId = category.Id,
                 CategoryName = category.Name,
-                CategorySlug = category.Slug
+                CategorySlug = category.Slug,
+                EffectiveAmount = storePrice != null ? storePrice.Amount : globalPrice!.Amount,
+                EffectiveCurrency = storePrice != null ? storePrice.Currency : globalPrice!.Currency
             };
-
-        return products;
     }
 
-    private async Task<Dictionary<Guid, (decimal Amount, string Currency)>> LoadEffectivePricesAsync(
-        ConsumerFulfillmentStore store,
-        IReadOnlyList<Guid> productIds,
-        CancellationToken cancellationToken)
-    {
-        var overrides = await dbContext.StoreProductPrices.AsNoTracking().IgnoreQueryFilters()
-            .Where(p => p.TenantId == store.TenantId
-                && p.StoreId == store.StoreId
-                && productIds.Contains(p.GlobalProductId)
-                && p.ValidTo == null)
-            .Select(p => new { p.GlobalProductId, p.Amount, p.Currency })
-            .ToListAsync(cancellationToken);
-
-        var suggested = await dbContext.GlobalProductPrices.AsNoTracking()
-            .Where(p => productIds.Contains(p.GlobalProductId) && p.ValidTo == null)
-            .Select(p => new { p.GlobalProductId, p.Amount, p.Currency })
-            .ToListAsync(cancellationToken);
-
-        var overrideByProduct = overrides.ToDictionary(x => x.GlobalProductId);
-        var suggestedByProduct = suggested.ToDictionary(x => x.GlobalProductId);
-
-        var result = new Dictionary<Guid, (decimal, string)>(productIds.Count);
-        foreach (var id in productIds)
-        {
-            if (overrideByProduct.TryGetValue(id, out var storePrice))
-            {
-                result[id] = (storePrice.Amount, storePrice.Currency);
-            }
-            else if (suggestedByProduct.TryGetValue(id, out var globalPrice))
-            {
-                result[id] = (globalPrice.Amount, globalPrice.Currency);
-            }
-            else
-            {
-                result[id] = (0m, string.Empty);
-            }
-        }
-
-        return result;
-    }
-
-    private sealed class CandidateRow
+    private sealed class CommercialProductRow
     {
         public Guid Id { get; init; }
         public string Sku { get; init; } = string.Empty;
@@ -211,5 +155,7 @@ public sealed class ConsumerCatalogReadStore(ChevrereDbContext dbContext) : ICon
         public Guid CategoryId { get; init; }
         public string CategoryName { get; init; } = string.Empty;
         public string? CategorySlug { get; init; }
+        public decimal EffectiveAmount { get; init; }
+        public string EffectiveCurrency { get; init; } = string.Empty;
     }
 }
