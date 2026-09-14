@@ -1,4 +1,4 @@
-using Chevrere.Infrastructure.Persistence;
+using Chevrere.SharedKernel.Persistence;
 using Chevrere.SharedKernel.Results;
 using Microsoft.AspNetCore.Mvc;
 

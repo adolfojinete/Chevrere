@@ -34,6 +34,24 @@ public sealed class InventoryStore(ChevrereDbContext dbContext) : IInventoryStor
 
     public void AddMovement(InventoryMovement movement) => dbContext.InventoryMovements.Add(movement);
 
+    public void DiscardItem(InventoryItem item)
+    {
+        var entry = dbContext.Entry(item);
+        if (entry.State != EntityState.Detached)
+        {
+            entry.State = EntityState.Detached;
+        }
+    }
+
+    public void DiscardMovement(InventoryMovement movement)
+    {
+        var entry = dbContext.Entry(movement);
+        if (entry.State != EntityState.Detached)
+        {
+            entry.State = EntityState.Detached;
+        }
+    }
+
     public Task<InventoryMovement?> GetMovementAsync(Guid movementId, CancellationToken cancellationToken) =>
         dbContext.InventoryMovements.AsNoTracking().FirstOrDefaultAsync(m => m.Id == movementId, cancellationToken);
 

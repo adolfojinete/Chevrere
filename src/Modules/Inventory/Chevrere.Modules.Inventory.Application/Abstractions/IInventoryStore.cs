@@ -21,6 +21,10 @@ public interface IInventoryStore
 
     void AddMovement(InventoryMovement movement);
 
+    void DiscardItem(InventoryItem item);
+
+    void DiscardMovement(InventoryMovement movement);
+
     Task<InventoryMovement?> GetMovementAsync(Guid movementId, CancellationToken cancellationToken);
 
     Task<(IReadOnlyList<InventoryListProjection> Items, int Total)> ListStoreInventoryAsync(

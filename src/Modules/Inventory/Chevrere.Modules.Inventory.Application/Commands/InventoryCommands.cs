@@ -1,5 +1,6 @@
 using Chevrere.Modules.Inventory.Application.Abstractions;
 using Chevrere.Modules.Inventory.Application.Contracts;
+using Chevrere.Modules.Inventory.Application.Idempotency;
 using Chevrere.Modules.Inventory.Domain;
 using Chevrere.SharedKernel.Application;
 using Chevrere.SharedKernel.Audit;
@@ -55,7 +56,7 @@ public sealed class InitializeInventoryHandler(
             IdempotencyOperations.InventoryInitialize,
             request.StoreId.ToString("D"),
             request.GlobalProductId.ToString("D"),
-            request.Quantity.ToString());
+            IdempotencyFingerprint.Format(request.Quantity));
 
         var existingKey = await idempotency.FindAsync(
             tenantId,
@@ -70,7 +71,12 @@ public sealed class InitializeInventoryHandler(
                     Error.Conflict("idempotency.key.reused", "Idempotency-Key was already used with a different payload."));
             }
 
-            return await ReplayInitializeAsync(store, request.StoreId, request.GlobalProductId, existingKey.ResourceId, cancellationToken);
+            return await InventoryIdempotencyReplay.ReplayFromWinnerAsync(
+                store,
+                IdempotencyOperations.InventoryInitialize,
+                existingKey.ResourceId,
+                request.Quantity,
+                cancellationToken);
         }
 
         if (await store.GetItemAsync(request.StoreId, request.GlobalProductId, cancellationToken) is not null)
@@ -97,7 +103,7 @@ public sealed class InitializeInventoryHandler(
             }
 
             var resourceId = movement?.Id ?? item.Id;
-            idempotency.Add(new IdempotentOperation
+            var op = new IdempotentOperation
             {
                 Id = Guid.CreateVersion7(),
                 TenantId = tenantId,
@@ -106,7 +112,8 @@ public sealed class InitializeInventoryHandler(
                 RequestHash = hash,
                 ResourceId = resourceId,
                 CreatedAt = clock.UtcNow
-            });
+            };
+            idempotency.Add(op);
 
             audit.Record(
                 AuditActions.InventoryInitialized,
@@ -116,55 +123,66 @@ public sealed class InitializeInventoryHandler(
                 previousValue: null,
                 newValue: new { item.OnHand, item.Reserved, request.Quantity });
 
+            var attempt = new InventoryMutationAttempt(
+                item,
+                movement,
+                op,
+                AuditActions.InventoryInitialized,
+                movement is null ? nameof(InventoryItem) : nameof(InventoryMovement),
+                resourceId);
+
             try
             {
                 await unitOfWork.SaveChangesAsync(cancellationToken);
             }
             catch (DuplicateKeyException)
             {
-                var raced = await idempotency.FindAsync(
+                var replay = await InventoryIdempotencyReplay.TryReplayAfterWriteConflictAsync(
+                    store,
+                    idempotency,
+                    audit,
+                    attempt,
                     tenantId,
                     IdempotencyOperations.InventoryInitialize,
                     request.IdempotencyKey,
+                    hash,
+                    request.Quantity,
                     cancellationToken);
-                if (raced is not null && string.Equals(raced.RequestHash, hash, StringComparison.Ordinal))
+                if (replay is not null)
                 {
-                    return await ReplayInitializeAsync(store, request.StoreId, request.GlobalProductId, raced.ResourceId, cancellationToken);
+                    return replay;
                 }
 
                 return Result.Failure<InventoryMutationDto>(
                     Error.Conflict("inventory.already_initialized", "Inventory has already been initialized for this product."));
             }
+            catch (ConcurrencyConflictException)
+            {
+                var replay = await InventoryIdempotencyReplay.TryReplayAfterWriteConflictAsync(
+                    store,
+                    idempotency,
+                    audit,
+                    attempt,
+                    tenantId,
+                    IdempotencyOperations.InventoryInitialize,
+                    request.IdempotencyKey,
+                    hash,
+                    request.Quantity,
+                    cancellationToken);
+                if (replay is not null)
+                {
+                    return replay;
+                }
 
-            return Result.Success(ToMutation(item, movement?.Id));
+                return Result.Failure<InventoryMutationDto>(ConcurrencyConflictException.ToError());
+            }
+
+            return Result.Success(InventoryIdempotencyReplay.FromItem(item, movement?.Id));
         }
         catch (DomainException ex)
         {
             return Result.Failure<InventoryMutationDto>(Error.Conflict(ex.Code, ex.Message));
         }
-    }
-
-    private static async Task<Result<InventoryMutationDto>> ReplayInitializeAsync(
-        IInventoryStore store,
-        Guid storeId,
-        Guid productId,
-        Guid? resourceId,
-        CancellationToken cancellationToken)
-    {
-        var item = await store.GetItemAsync(storeId, productId, cancellationToken);
-        if (item is null)
-        {
-            return Result.Failure<InventoryMutationDto>(
-                Error.Conflict(ErrorCodes.Conflict, "Idempotent initialize could not be replayed."));
-        }
-
-        Guid? movementId = null;
-        if (resourceId is Guid id && id != item.Id)
-        {
-            movementId = id;
-        }
-
-        return Result.Success(ToMutation(item, movementId));
     }
 
     internal static async Task<Error?> EnsureStoreProductAsync(
@@ -187,9 +205,6 @@ public sealed class InitializeInventoryHandler(
 
         return null;
     }
-
-    private static InventoryMutationDto ToMutation(InventoryItem item, Guid? movementId) =>
-        new(item.Id, movementId, item.OnHand, item.Reserved, item.Available);
 }
 
 public sealed record AdjustInventoryCommand(
@@ -234,13 +249,14 @@ public sealed class AdjustInventoryHandler(
             return Result.Failure<InventoryMutationDto>(access);
         }
 
+        var reason = request.Reason.Trim();
         var hash = IdempotencyFingerprint.Sha256(
             IdempotencyOperations.InventoryAdjust,
             request.StoreId.ToString("D"),
             request.GlobalProductId.ToString("D"),
             request.Type.ToString(),
-            request.Quantity.ToString(),
-            request.Reason.Trim());
+            IdempotencyFingerprint.Format(request.Quantity),
+            reason);
 
         var existingKey = await idempotency.FindAsync(
             tenantId, IdempotencyOperations.InventoryAdjust, request.IdempotencyKey, cancellationToken);
@@ -252,7 +268,8 @@ public sealed class AdjustInventoryHandler(
                     Error.Conflict("idempotency.key.reused", "Idempotency-Key was already used with a different payload."));
             }
 
-            return await ReplayMutationAsync(store, request.StoreId, request.GlobalProductId, existingKey.ResourceId, cancellationToken);
+            return await InventoryIdempotencyReplay.ReplayFromWinnerAsync(
+                store, IdempotencyOperations.InventoryAdjust, existingKey.ResourceId, null, cancellationToken);
         }
 
         var item = await store.GetItemAsync(request.StoreId, request.GlobalProductId, cancellationToken);
@@ -266,11 +283,11 @@ public sealed class AdjustInventoryHandler(
         {
             var before = item.OnHand;
             var movement = request.Type == InventoryAdjustmentType.Increase
-                ? item.Increase(request.Quantity, request.Reason, currentUser.UserId, correlation.CorrelationId, clock.UtcNow)
-                : item.Decrease(request.Quantity, request.Reason, currentUser.UserId, correlation.CorrelationId, clock.UtcNow);
+                ? item.Increase(request.Quantity, reason, currentUser.UserId, correlation.CorrelationId, clock.UtcNow)
+                : item.Decrease(request.Quantity, reason, currentUser.UserId, correlation.CorrelationId, clock.UtcNow);
 
             store.AddMovement(movement);
-            idempotency.Add(new IdempotentOperation
+            var op = new IdempotentOperation
             {
                 Id = Guid.CreateVersion7(),
                 TenantId = tenantId,
@@ -279,7 +296,8 @@ public sealed class AdjustInventoryHandler(
                 RequestHash = hash,
                 ResourceId = movement.Id,
                 CreatedAt = clock.UtcNow
-            });
+            };
+            idempotency.Add(op);
 
             audit.Record(
                 AuditActions.InventoryAdjusted,
@@ -289,45 +307,65 @@ public sealed class AdjustInventoryHandler(
                 previousValue: new { OnHand = before },
                 newValue: new { movement.OnHandAfter, Delta = movement.OnHandDelta, Reason = movement.Reason });
 
+            var attempt = new InventoryMutationAttempt(
+                item,
+                movement,
+                op,
+                AuditActions.InventoryAdjusted,
+                nameof(InventoryMovement),
+                movement.Id);
+
             try
             {
                 await unitOfWork.SaveChangesAsync(cancellationToken);
             }
             catch (DuplicateKeyException)
             {
-                var raced = await idempotency.FindAsync(
-                    tenantId, IdempotencyOperations.InventoryAdjust, request.IdempotencyKey, cancellationToken);
-                if (raced is not null && string.Equals(raced.RequestHash, hash, StringComparison.Ordinal))
+                var replay = await InventoryIdempotencyReplay.TryReplayAfterWriteConflictAsync(
+                    store,
+                    idempotency,
+                    audit,
+                    attempt,
+                    tenantId,
+                    IdempotencyOperations.InventoryAdjust,
+                    request.IdempotencyKey,
+                    hash,
+                    null,
+                    cancellationToken);
+                if (replay is not null)
                 {
-                    return await ReplayMutationAsync(store, request.StoreId, request.GlobalProductId, raced.ResourceId, cancellationToken);
+                    return replay;
                 }
 
                 throw;
             }
+            catch (ConcurrencyConflictException)
+            {
+                var replay = await InventoryIdempotencyReplay.TryReplayAfterWriteConflictAsync(
+                    store,
+                    idempotency,
+                    audit,
+                    attempt,
+                    tenantId,
+                    IdempotencyOperations.InventoryAdjust,
+                    request.IdempotencyKey,
+                    hash,
+                    null,
+                    cancellationToken);
+                if (replay is not null)
+                {
+                    return replay;
+                }
 
-            return Result.Success(new InventoryMutationDto(item.Id, movement.Id, item.OnHand, item.Reserved, item.Available));
+                return Result.Failure<InventoryMutationDto>(ConcurrencyConflictException.ToError());
+            }
+
+            return Result.Success(InventoryIdempotencyReplay.FromMovement(movement));
         }
         catch (DomainException ex)
         {
             return Result.Failure<InventoryMutationDto>(Error.Conflict(ex.Code, ex.Message));
         }
-    }
-
-    internal static async Task<Result<InventoryMutationDto>> ReplayMutationAsync(
-        IInventoryStore store,
-        Guid storeId,
-        Guid productId,
-        Guid? movementId,
-        CancellationToken cancellationToken)
-    {
-        var item = await store.GetItemAsync(storeId, productId, cancellationToken);
-        if (item is null)
-        {
-            return Result.Failure<InventoryMutationDto>(
-                Error.Conflict(ErrorCodes.Conflict, "Idempotent mutation could not be replayed."));
-        }
-
-        return Result.Success(new InventoryMutationDto(item.Id, movementId, item.OnHand, item.Reserved, item.Available));
     }
 }
 
@@ -372,12 +410,13 @@ public sealed class WasteInventoryHandler(
             return Result.Failure<InventoryMutationDto>(access);
         }
 
+        var reason = request.Reason.Trim();
         var hash = IdempotencyFingerprint.Sha256(
             IdempotencyOperations.InventoryWaste,
             request.StoreId.ToString("D"),
             request.GlobalProductId.ToString("D"),
-            request.Quantity.ToString(),
-            request.Reason.Trim());
+            IdempotencyFingerprint.Format(request.Quantity),
+            reason);
 
         var existingKey = await idempotency.FindAsync(
             tenantId, IdempotencyOperations.InventoryWaste, request.IdempotencyKey, cancellationToken);
@@ -389,8 +428,8 @@ public sealed class WasteInventoryHandler(
                     Error.Conflict("idempotency.key.reused", "Idempotency-Key was already used with a different payload."));
             }
 
-            return await AdjustInventoryHandler.ReplayMutationAsync(
-                store, request.StoreId, request.GlobalProductId, existingKey.ResourceId, cancellationToken);
+            return await InventoryIdempotencyReplay.ReplayFromWinnerAsync(
+                store, IdempotencyOperations.InventoryWaste, existingKey.ResourceId, null, cancellationToken);
         }
 
         var item = await store.GetItemAsync(request.StoreId, request.GlobalProductId, cancellationToken);
@@ -404,9 +443,9 @@ public sealed class WasteInventoryHandler(
         {
             var before = item.OnHand;
             var movement = item.RecordWaste(
-                request.Quantity, request.Reason, currentUser.UserId, correlation.CorrelationId, clock.UtcNow);
+                request.Quantity, reason, currentUser.UserId, correlation.CorrelationId, clock.UtcNow);
             store.AddMovement(movement);
-            idempotency.Add(new IdempotentOperation
+            var op = new IdempotentOperation
             {
                 Id = Guid.CreateVersion7(),
                 TenantId = tenantId,
@@ -415,7 +454,8 @@ public sealed class WasteInventoryHandler(
                 RequestHash = hash,
                 ResourceId = movement.Id,
                 CreatedAt = clock.UtcNow
-            });
+            };
+            idempotency.Add(op);
 
             audit.Record(
                 AuditActions.InventoryWasteRecorded,
@@ -425,24 +465,60 @@ public sealed class WasteInventoryHandler(
                 previousValue: new { OnHand = before },
                 newValue: new { movement.OnHandAfter, Delta = movement.OnHandDelta, Reason = movement.Reason });
 
+            var attempt = new InventoryMutationAttempt(
+                item,
+                movement,
+                op,
+                AuditActions.InventoryWasteRecorded,
+                nameof(InventoryMovement),
+                movement.Id);
+
             try
             {
                 await unitOfWork.SaveChangesAsync(cancellationToken);
             }
             catch (DuplicateKeyException)
             {
-                var raced = await idempotency.FindAsync(
-                    tenantId, IdempotencyOperations.InventoryWaste, request.IdempotencyKey, cancellationToken);
-                if (raced is not null && string.Equals(raced.RequestHash, hash, StringComparison.Ordinal))
+                var replay = await InventoryIdempotencyReplay.TryReplayAfterWriteConflictAsync(
+                    store,
+                    idempotency,
+                    audit,
+                    attempt,
+                    tenantId,
+                    IdempotencyOperations.InventoryWaste,
+                    request.IdempotencyKey,
+                    hash,
+                    null,
+                    cancellationToken);
+                if (replay is not null)
                 {
-                    return await AdjustInventoryHandler.ReplayMutationAsync(
-                        store, request.StoreId, request.GlobalProductId, raced.ResourceId, cancellationToken);
+                    return replay;
                 }
 
                 throw;
             }
+            catch (ConcurrencyConflictException)
+            {
+                var replay = await InventoryIdempotencyReplay.TryReplayAfterWriteConflictAsync(
+                    store,
+                    idempotency,
+                    audit,
+                    attempt,
+                    tenantId,
+                    IdempotencyOperations.InventoryWaste,
+                    request.IdempotencyKey,
+                    hash,
+                    null,
+                    cancellationToken);
+                if (replay is not null)
+                {
+                    return replay;
+                }
 
-            return Result.Success(new InventoryMutationDto(item.Id, movement.Id, item.OnHand, item.Reserved, item.Available));
+                return Result.Failure<InventoryMutationDto>(ConcurrencyConflictException.ToError());
+            }
+
+            return Result.Success(InventoryIdempotencyReplay.FromMovement(movement));
         }
         catch (DomainException ex)
         {

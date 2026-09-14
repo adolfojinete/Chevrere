@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Chevrere.Api.Http;
 using Chevrere.Infrastructure.Persistence;
+using Chevrere.SharedKernel.Persistence;
 using Chevrere.Modules.Identity.Domain;
 using Chevrere.Modules.Tenancy.Application.Commands.ActivateFranchisee;
 using Chevrere.Modules.Tenancy.Application.Commands.ReactivateFranchisee;

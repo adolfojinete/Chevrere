@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Chevrere.Api.Http;
 using Chevrere.Infrastructure.Persistence;
+using Chevrere.SharedKernel.Persistence;
 using Chevrere.Modules.Catalog.Application.Commands;
 using Chevrere.Modules.Catalog.Application.Contracts;
 using Chevrere.Modules.Catalog.Application.Queries;

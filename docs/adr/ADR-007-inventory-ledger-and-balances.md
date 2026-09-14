@@ -2,7 +2,7 @@
 
 ## Estado
 
-Aceptado — Fase 4.
+Aceptado — Fase 4 / endurecido en Fase 4.1.
 
 ## Contexto
 
@@ -29,18 +29,42 @@ Toda mutación de balance (excepto Initialize 0) inserta exactamente un movement
 
 ### Idempotencia
 
-Mutaciones cuantitativas **no** son naturalmente idempotentes. Header `Idempotency-Key` obligatorio (8..128, case-sensitive, sin whitespace). Building block `idempotent_operations` con `UNIQUE(TenantId, Operation, IdempotencyKey)` y fingerprint SHA-256 del payload canónico. Solo se persiste tras éxito. Mismo key + mismo payload → replay. Mismo key + payload distinto → `idempotency.key.reused`. Fallos de negocio/concurrencia no consumen la key.
+Mutaciones cuantitativas **no** son naturalmente idempotentes. Header `Idempotency-Key` obligatorio (8..128, case-sensitive, sin whitespace). Building block `idempotent_operations` con `UNIQUE(TenantId, Operation, IdempotencyKey)` y fingerprint SHA-256 del payload canónico (`InvariantCulture` para cantidades). Solo se persiste tras éxito. Mismo key + mismo payload → replay. Mismo key + payload distinto → `idempotency.key.reused`. Fallos de negocio **no** consumen la key (pueden reintentarse tras corregir).
+
+### Idempotency under concurrency
+
+Dos requests concurrentes con **same key + same payload** pueden ambos pasar el pre-check y construir un intento local. El perdedor puede observar:
+
+1. `23505 UniqueViolation` sobre `idempotent_operations`, o
+2. conflicto `xmin` sobre `InventoryItem`.
+
+En ambos casos el handler:
+
+1. limpia **solo** las entries del intento fallido (`InventoryItem` Added/Modified, `InventoryMovement` Added, `AuditEvent` Added, `IdempotentOperation` Added) — sin detach global ni `ChangeTracker.Clear()`;
+2. consulta la `IdempotentOperation` **committed** (`AsNoTracking`);
+3. si hash coincide → replay success; si no hay row → conflicto original (`already_initialized` / concurrency); si hash difiere → `idempotency.key.reused`.
+
+Keys distintas siguen compitiendo normalmente: un success y un 409 de concurrencia/negocio. No se convierte cualquier `ConcurrencyConflictException` en replay.
+
+### Replay exacto (snapshot)
+
+El replay **no** usa el balance actual de `InventoryItem` (podría haber mutado después). Usa el snapshot del ledger:
+
+- Adjust / Waste / Initialize(n>0): `ResourceId` → `InventoryMovement`; respuesta = `OnHandAfter` / `ReservedAfter` / `Available`.
+- Initialize(0): respuesta fija `0/0/0` con `MovementId = null` (el resultado original es siempre cero).
+
+Así, `same key` ⇒ **mismo resultado semántico**, no el estado posterior de la Store.
 
 ### Concurrencia e integridad
 
 - Optimistic concurrency con `xmin` en `InventoryItem`.
-- Conflictos → 409 sin retry automático de decrementos.
+- Conflictos entre intenciones distintas → 409 sin retry automático de decrementos.
 - CHECKs PostgreSQL: `on_hand >= 0`, `reserved >= 0`, `reserved <= on_hand`.
 - FK a `Store` y `StoreProduct` (compuestas con tenant). Unique por store+product.
 
 ### Alcance explícitamente fuera
 
-Orders/reservas API, Receipt/Procurement, transfers, lots, FIFO, costos, Redis, RabbitMQ, soft-delete de inventory.
+Orders/reservas API, Receipt/Procurement, transfers, lots, FIFO, costos, Redis, RabbitMQ, soft-delete de inventory. Retención/cleanup de `idempotent_operations` queda pendiente.
 
 Reservas futuras: `Reserved` queda preparado en el modelo; endpoints Reserve/Release/Commit no se exponen aún.
 

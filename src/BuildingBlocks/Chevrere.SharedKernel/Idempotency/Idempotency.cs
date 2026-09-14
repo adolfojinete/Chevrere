@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -24,6 +25,8 @@ public static class IdempotencyKeyRules
 
 public static class IdempotencyFingerprint
 {
+    public static string Format(long value) => value.ToString(CultureInfo.InvariantCulture);
+
     public static string Sha256(params string?[] parts)
     {
         var canonical = string.Join('|', parts.Select(p => p ?? string.Empty));
@@ -61,4 +64,9 @@ public interface IIdempotencyStore
         CancellationToken cancellationToken);
 
     void Add(IdempotentOperation operation);
+
+    /// <summary>
+    /// Detaches a pending (Added) idempotency row from a failed write attempt.
+    /// </summary>
+    void DiscardPending(IdempotentOperation operation);
 }

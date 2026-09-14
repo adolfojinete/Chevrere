@@ -1,3 +1,4 @@
+using System.Globalization;
 using Chevrere.SharedKernel.Idempotency;
 
 namespace Chevrere.UnitTests.SharedKernel;
@@ -29,5 +30,30 @@ public sealed class IdempotencyFingerprintTests
         Assert.False(IdempotencyKeyRules.IsValid("ABC DEF"));
         Assert.False(IdempotencyKeyRules.IsValid("short"));
         Assert.False(IdempotencyKeyRules.IsValid(null));
+    }
+
+    [Fact]
+    public void Quantity_fingerprint_is_culture_invariant()
+    {
+        var original = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("es-CO");
+            var es = IdempotencyFingerprint.Sha256(
+                IdempotencyOperations.InventoryAdjust,
+                IdempotencyFingerprint.Format(5));
+
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
+            var en = IdempotencyFingerprint.Sha256(
+                IdempotencyOperations.InventoryAdjust,
+                IdempotencyFingerprint.Format(5));
+
+            Assert.Equal(es, en);
+            Assert.Equal("5", IdempotencyFingerprint.Format(5));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
     }
 }
