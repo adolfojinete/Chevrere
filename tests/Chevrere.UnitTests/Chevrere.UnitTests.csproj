@@ -26,5 +26,6 @@
     <ProjectReference Include="..\..\src\Modules\Tenancy\Chevrere.Modules.Tenancy.Domain\Chevrere.Modules.Tenancy.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Catalog\Chevrere.Modules.Catalog.Domain\Chevrere.Modules.Catalog.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Catalog\Chevrere.Modules.Catalog.Application\Chevrere.Modules.Catalog.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Pricing\Chevrere.Modules.Pricing.Domain\Chevrere.Modules.Pricing.Domain.csproj" />
   </ItemGroup>
 </Project>

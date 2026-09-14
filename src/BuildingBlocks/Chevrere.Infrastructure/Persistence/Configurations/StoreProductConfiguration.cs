@@ -11,6 +11,7 @@ public sealed class StoreProductConfiguration : IEntityTypeConfiguration<StorePr
     {
         builder.ToTable("store_products");
         builder.HasKey(x => x.Id);
+        builder.HasAlternateKey(x => new { x.TenantId, x.StoreId, x.GlobalProductId });
 
         builder.HasIndex(x => new { x.StoreId, x.GlobalProductId }).IsUnique();
         builder.HasIndex(x => x.TenantId);

@@ -23,4 +23,9 @@ public static class AuditActions
     public const string GlobalProductDeactivated = "global_product.deactivated";
     public const string StoreProductEnabled = "store_product.enabled";
     public const string StoreProductDisabled = "store_product.disabled";
+    public const string GlobalSuggestedPriceSet = "global_product_price.set";
+    public const string GlobalSuggestedPriceChanged = "global_product_price.changed";
+    public const string StorePriceSet = "store_product_price.set";
+    public const string StorePriceChanged = "store_product_price.changed";
+    public const string StorePriceRemoved = "store_product_price.removed";
 }

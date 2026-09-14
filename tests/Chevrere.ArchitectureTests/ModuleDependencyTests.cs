@@ -5,6 +5,9 @@ using Chevrere.Modules.Catalog.Infrastructure;
 using Chevrere.Modules.Identity.Application;
 using Chevrere.Modules.Identity.Domain;
 using Chevrere.Modules.Identity.Infrastructure;
+using Chevrere.Modules.Pricing.Application;
+using Chevrere.Modules.Pricing.Domain;
+using Chevrere.Modules.Pricing.Infrastructure;
 using Chevrere.Modules.Subscriptions.Application;
 using Chevrere.Modules.Subscriptions.Domain;
 using Chevrere.Modules.Subscriptions.Infrastructure;
@@ -27,6 +30,7 @@ public sealed class ModuleDependencyTests
             typeof(Tenant).Assembly,
             typeof(Plan).Assembly,
             typeof(Category).Assembly,
+            typeof(GlobalProductPrice).Assembly,
             typeof(Entity).Assembly
         };
 
@@ -44,7 +48,9 @@ public sealed class ModuleDependencyTests
                     "Chevrere.Modules.Subscriptions.Application",
                     "Chevrere.Modules.Subscriptions.Infrastructure",
                     "Chevrere.Modules.Catalog.Application",
-                    "Chevrere.Modules.Catalog.Infrastructure")
+                    "Chevrere.Modules.Catalog.Infrastructure",
+                    "Chevrere.Modules.Pricing.Application",
+                    "Chevrere.Modules.Pricing.Infrastructure")
                 .GetResult();
 
             Assert.True(result.IsSuccessful, Format(result));
@@ -59,7 +65,8 @@ public sealed class ModuleDependencyTests
             typeof(IdentityApplicationExtensions).Assembly,
             typeof(TenancyApplicationExtensions).Assembly,
             typeof(SubscriptionsApplicationExtensions).Assembly,
-            typeof(CatalogApplicationExtensions).Assembly
+            typeof(CatalogApplicationExtensions).Assembly,
+            typeof(PricingApplicationExtensions).Assembly
         };
 
         foreach (var assembly in assemblies)
@@ -72,7 +79,8 @@ public sealed class ModuleDependencyTests
                     "Chevrere.Modules.Identity.Infrastructure",
                     "Chevrere.Modules.Tenancy.Infrastructure",
                     "Chevrere.Modules.Subscriptions.Infrastructure",
-                    "Chevrere.Modules.Catalog.Infrastructure")
+                    "Chevrere.Modules.Catalog.Infrastructure",
+                    "Chevrere.Modules.Pricing.Infrastructure")
                 .GetResult();
 
             Assert.True(result.IsSuccessful, Format(result));
@@ -127,6 +135,23 @@ public sealed class ModuleDependencyTests
     }
 
     [Fact]
+    public void Pricing_application_does_not_depend_on_catalog_or_tenancy_modules()
+    {
+        var result = Types.InAssembly(typeof(PricingApplicationExtensions).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "Chevrere.Modules.Catalog.Application",
+                "Chevrere.Modules.Catalog.Domain",
+                "Chevrere.Modules.Catalog.Infrastructure",
+                "Chevrere.Modules.Tenancy.Application",
+                "Chevrere.Modules.Tenancy.Domain",
+                "Chevrere.Modules.Tenancy.Infrastructure")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, Format(result));
+    }
+
+    [Fact]
     public void Module_infrastructure_does_not_depend_on_api()
     {
         var assemblies = new[]
@@ -134,7 +159,8 @@ public sealed class ModuleDependencyTests
             typeof(IdentityInfrastructureExtensions).Assembly,
             typeof(TenancyInfrastructureExtensions).Assembly,
             typeof(SubscriptionsInfrastructureExtensions).Assembly,
-            typeof(CatalogInfrastructureExtensions).Assembly
+            typeof(CatalogInfrastructureExtensions).Assembly,
+            typeof(PricingInfrastructureExtensions).Assembly
         };
 
         foreach (var assembly in assemblies)

@@ -1,6 +1,7 @@
 using Chevrere.Infrastructure.Audit;
 using Chevrere.Infrastructure.Identity;
 using Chevrere.Modules.Catalog.Domain;
+using Chevrere.Modules.Pricing.Domain;
 using Chevrere.Modules.Subscriptions.Domain;
 using Chevrere.Modules.Tenancy.Domain;
 using Chevrere.SharedKernel.Context;
@@ -34,6 +35,10 @@ public sealed class ChevrereDbContext(
 
     public DbSet<StoreProduct> StoreProducts => Set<StoreProduct>();
 
+    public DbSet<GlobalProductPrice> GlobalProductPrices => Set<GlobalProductPrice>();
+
+    public DbSet<StoreProductPrice> StoreProductPrices => Set<StoreProductPrice>();
+
     public bool BypassTenantFilter => tenantFilterBypass.Enabled || currentUser.IsPlatformUser;
 
     public Guid FilterTenantId => currentUser.TenantId ?? Guid.Empty;
@@ -49,6 +54,7 @@ public sealed class ChevrereDbContext(
         builder.Entity<Subscription>().HasQueryFilter(s => BypassTenantFilter || s.TenantId == FilterTenantId);
         builder.Entity<AuditEvent>().HasQueryFilter(a => BypassTenantFilter || a.TenantId == FilterTenantId);
         builder.Entity<StoreProduct>().HasQueryFilter(s => BypassTenantFilter || s.TenantId == FilterTenantId);
+        builder.Entity<StoreProductPrice>().HasQueryFilter(s => BypassTenantFilter || s.TenantId == FilterTenantId);
 
         builder.Entity<ApplicationUser>().ToTable("users");
         builder.Entity<ApplicationRole>().ToTable("roles");
