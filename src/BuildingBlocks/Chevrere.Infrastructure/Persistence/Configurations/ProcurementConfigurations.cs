@@ -105,6 +105,9 @@ public sealed class PurchaseOrderItemConfiguration : IEntityTypeConfiguration<Pu
 
         builder.HasKey(x => x.Id);
         builder.HasAlternateKey(x => new { x.Id, x.TenantId });
+        // Lets goods_receipt_items FK prove the line belongs to the same PO and product as the PO item.
+        builder.HasAlternateKey(x => new { x.Id, x.PurchaseOrderId, x.TenantId, x.GlobalProductId })
+            .HasName("ak_purchase_order_items_id_purchase_order_id_tenant_id_global_pr");
         builder.Ignore(x => x.RemainingQuantity);
         builder.Ignore(x => x.IsFullyReceived);
 
@@ -145,6 +148,9 @@ public sealed class GoodsReceiptConfiguration : IEntityTypeConfiguration<GoodsRe
         builder.ToTable("goods_receipts");
         builder.HasKey(x => x.Id);
         builder.HasAlternateKey(x => new { x.Id, x.TenantId });
+        // Lets goods_receipt_items FK prove the child carries the same PurchaseOrderId as the receipt.
+        builder.HasAlternateKey(x => new { x.Id, x.PurchaseOrderId, x.TenantId })
+            .HasName("ak_goods_receipts_id_purchase_order_id_tenant_id");
 
         builder.Property(x => x.ReceiptNumber).HasMaxLength(40).IsRequired();
         builder.Property(x => x.Notes).HasMaxLength(1000);
@@ -162,8 +168,8 @@ public sealed class GoodsReceiptConfiguration : IEntityTypeConfiguration<GoodsRe
 
         builder.HasMany(x => x.Items)
             .WithOne()
-            .HasForeignKey(x => new { x.GoodsReceiptId, x.TenantId })
-            .HasPrincipalKey(x => new { x.Id, x.TenantId })
+            .HasForeignKey(x => new { x.GoodsReceiptId, x.PurchaseOrderId, x.TenantId })
+            .HasPrincipalKey(x => new { x.Id, x.PurchaseOrderId, x.TenantId })
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Metadata.FindNavigation(nameof(GoodsReceipt.Items))!
@@ -219,6 +225,7 @@ public sealed class GoodsReceiptItemConfiguration : IEntityTypeConfiguration<Goo
             .IsUnique()
             .HasDatabaseName("ix_goods_receipt_items_receipt_order_item");
         builder.HasIndex(x => x.TenantId);
+        builder.HasIndex(x => x.PurchaseOrderId);
         builder.HasIndex(x => x.InventoryMovementId);
 
         builder.HasOne<Tenant>()
@@ -226,10 +233,11 @@ public sealed class GoodsReceiptItemConfiguration : IEntityTypeConfiguration<Goo
             .HasForeignKey(x => x.TenantId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Composite FK: same tenant + same PO + same product as the purchase-order line.
         builder.HasOne<PurchaseOrderItem>()
             .WithMany()
-            .HasForeignKey(x => new { x.PurchaseOrderItemId, x.TenantId })
-            .HasPrincipalKey(x => new { x.Id, x.TenantId })
+            .HasForeignKey(x => new { x.PurchaseOrderItemId, x.PurchaseOrderId, x.TenantId, x.GlobalProductId })
+            .HasPrincipalKey(x => new { x.Id, x.PurchaseOrderId, x.TenantId, x.GlobalProductId })
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne<GlobalProduct>()

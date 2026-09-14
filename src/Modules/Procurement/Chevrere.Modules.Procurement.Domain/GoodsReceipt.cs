@@ -78,7 +78,7 @@ public sealed class GoodsReceipt : AggregateRoot
 
         foreach (var line in receipt.Lines)
         {
-            result._items.Add(GoodsReceiptItem.Create(result.Id, order.TenantId, line, utcNow));
+            result._items.Add(GoodsReceiptItem.Create(result.Id, order.TenantId, order.Id, line, utcNow));
         }
 
         return result;

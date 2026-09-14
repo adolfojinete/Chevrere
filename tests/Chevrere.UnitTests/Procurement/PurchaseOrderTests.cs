@@ -317,7 +317,9 @@ public sealed class PurchaseOrderTests
         Assert.Equal(PurchaseOrderStatus.PartiallyReceived, goodsReceipt.PurchaseOrderStatusAfter);
 
         var line = Assert.Single(goodsReceipt.Items);
+        Assert.Equal(order.Id, line.PurchaseOrderId);
         Assert.Equal(order.Items[0].Id, line.PurchaseOrderItemId);
+        Assert.Equal(order.Items[0].GlobalProductId, line.GlobalProductId);
         Assert.Equal(4, line.ReceivedQuantity);
         Assert.Equal(0, line.ReceivedBefore);
         Assert.Equal(4, line.ReceivedAfter);

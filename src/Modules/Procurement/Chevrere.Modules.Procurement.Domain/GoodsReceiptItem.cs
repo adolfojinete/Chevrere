@@ -16,6 +16,12 @@ public sealed class GoodsReceiptItem : Entity
 
     public Guid TenantId { get; private set; }
 
+    /// <summary>
+    /// Denormalized from the parent receipt so PostgreSQL can prove this line belongs to the same
+    /// purchase order as both the receipt and the referenced purchase-order item.
+    /// </summary>
+    public Guid PurchaseOrderId { get; private set; }
+
     public Guid PurchaseOrderItemId { get; private set; }
 
     public Guid GlobalProductId { get; private set; }
@@ -33,6 +39,7 @@ public sealed class GoodsReceiptItem : Entity
     internal static GoodsReceiptItem Create(
         Guid goodsReceiptId,
         Guid tenantId,
+        Guid purchaseOrderId,
         GoodsReceiptLineSnapshot snapshot,
         DateTimeOffset utcNow)
     {
@@ -42,6 +49,7 @@ public sealed class GoodsReceiptItem : Entity
             Id = Guid.CreateVersion7(),
             GoodsReceiptId = goodsReceiptId,
             TenantId = tenantId,
+            PurchaseOrderId = purchaseOrderId,
             PurchaseOrderItemId = snapshot.PurchaseOrderItemId,
             GlobalProductId = snapshot.GlobalProductId,
             ReceivedQuantity = snapshot.ReceivedQuantity,
