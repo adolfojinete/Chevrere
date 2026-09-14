@@ -22,6 +22,10 @@ namespace Chevrere.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.HasSequence("procurement_goods_receipt_number_seq");
+
+            modelBuilder.HasSequence("procurement_purchase_order_number_seq");
+
             modelBuilder.Entity("Chevrere.Infrastructure.Audit.AuditEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -634,6 +638,11 @@ namespace Chevrere.Infrastructure.Persistence.Migrations
                     b.HasIndex("InventoryItemId", "TenantId")
                         .HasDatabaseName("ix_inventory_movements_inventory_item_id_tenant_id");
 
+                    b.HasIndex("Type", "ReferenceType", "ReferenceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_inventory_movements_reference_unique")
+                        .HasFilter("reference_id IS NOT NULL");
+
                     b.ToTable("inventory_movements", (string)null);
                 });
 
@@ -777,6 +786,456 @@ namespace Chevrere.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_store_product_prices_amount_positive", "amount > 0");
                         });
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Procurement.Domain.GoodsReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<Guid>("PurchaseOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_order_id");
+
+                    b.Property<string>("PurchaseOrderStatusAfter")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("purchase_order_status_after");
+
+                    b.Property<string>("ReceiptNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("receipt_number");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("store_id");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_goods_receipts");
+
+                    b.HasAlternateKey("Id", "TenantId")
+                        .HasName("ak_goods_receipts_id_tenant_id");
+
+                    b.HasAlternateKey("Id", "PurchaseOrderId", "TenantId")
+                        .HasName("ak_goods_receipts_id_purchase_order_id_tenant_id");
+
+                    b.HasIndex("PurchaseOrderId", "ReceivedAt")
+                        .HasDatabaseName("ix_goods_receipts_order_received_at");
+
+                    b.HasIndex("PurchaseOrderId", "TenantId")
+                        .HasDatabaseName("ix_goods_receipts_purchase_order_id_tenant_id");
+
+                    b.HasIndex("StoreId", "TenantId")
+                        .HasDatabaseName("ix_goods_receipts_store_id_tenant_id");
+
+                    b.HasIndex("SupplierId", "TenantId")
+                        .HasDatabaseName("ix_goods_receipts_supplier_id_tenant_id");
+
+                    b.HasIndex("TenantId", "ReceiptNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_goods_receipts_tenant_number");
+
+                    b.ToTable("goods_receipts", (string)null);
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Procurement.Domain.GoodsReceiptItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("GlobalProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("global_product_id");
+
+                    b.Property<Guid>("GoodsReceiptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("goods_receipt_id");
+
+                    b.Property<Guid?>("InventoryMovementId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("inventory_movement_id");
+
+                    b.Property<Guid>("PurchaseOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_order_id");
+
+                    b.Property<Guid>("PurchaseOrderItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_order_item_id");
+
+                    b.Property<long>("ReceivedAfter")
+                        .HasColumnType("bigint")
+                        .HasColumnName("received_after");
+
+                    b.Property<long>("ReceivedBefore")
+                        .HasColumnType("bigint")
+                        .HasColumnName("received_before");
+
+                    b.Property<long>("ReceivedQuantity")
+                        .HasColumnType("bigint")
+                        .HasColumnName("received_quantity");
+
+                    b.Property<long>("RemainingAfter")
+                        .HasColumnType("bigint")
+                        .HasColumnName("remaining_after");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_goods_receipt_items");
+
+                    b.HasIndex("GlobalProductId")
+                        .HasDatabaseName("ix_goods_receipt_items_global_product_id");
+
+                    b.HasIndex("InventoryMovementId")
+                        .HasDatabaseName("ix_goods_receipt_items_inventory_movement_id");
+
+                    b.HasIndex("PurchaseOrderId")
+                        .HasDatabaseName("ix_goods_receipt_items_purchase_order_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_goods_receipt_items_tenant_id");
+
+                    b.HasIndex("GoodsReceiptId", "PurchaseOrderItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_goods_receipt_items_receipt_order_item");
+
+                    b.HasIndex("GoodsReceiptId", "PurchaseOrderId", "TenantId")
+                        .HasDatabaseName("ix_goods_receipt_items_goods_receipt_id_purchase_order_id_tena");
+
+                    b.HasIndex("PurchaseOrderItemId", "PurchaseOrderId", "TenantId", "GlobalProductId")
+                        .HasDatabaseName("ix_goods_receipt_items_purchase_order_item_id_purchase_order_i");
+
+                    b.ToTable("goods_receipt_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_goods_receipt_items_received_before_non_negative", "received_before >= 0");
+
+                            t.HasCheckConstraint("ck_goods_receipt_items_received_chain", "received_after = received_before + received_quantity");
+
+                            t.HasCheckConstraint("ck_goods_receipt_items_received_positive", "received_quantity > 0");
+
+                            t.HasCheckConstraint("ck_goods_receipt_items_remaining_non_negative", "remaining_after >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Procurement.Domain.PurchaseOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_at");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("cancel_reason");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancelled_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("number");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("store_id");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_purchase_orders");
+
+                    b.HasAlternateKey("Id", "TenantId")
+                        .HasName("ak_purchase_orders_id_tenant_id");
+
+                    b.HasIndex("SupplierId")
+                        .HasDatabaseName("ix_purchase_orders_supplier_id");
+
+                    b.HasIndex("StoreId", "TenantId")
+                        .HasDatabaseName("ix_purchase_orders_store_id_tenant_id");
+
+                    b.HasIndex("SupplierId", "TenantId")
+                        .HasDatabaseName("ix_purchase_orders_supplier_id_tenant_id");
+
+                    b.HasIndex("TenantId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_purchase_orders_tenant_number");
+
+                    b.HasIndex("TenantId", "StoreId", "Status")
+                        .HasDatabaseName("ix_purchase_orders_tenant_store_status");
+
+                    b.ToTable("purchase_orders", (string)null);
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Procurement.Domain.PurchaseOrderItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("GlobalProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("global_product_id");
+
+                    b.Property<long>("OrderedQuantity")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ordered_quantity");
+
+                    b.Property<Guid>("PurchaseOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("purchase_order_id");
+
+                    b.Property<long>("ReceivedQuantity")
+                        .HasColumnType("bigint")
+                        .HasColumnName("received_quantity");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("store_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("UnitCostAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("unit_cost_amount");
+
+                    b.Property<string>("UnitCostCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("unit_cost_currency");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_purchase_order_items");
+
+                    b.HasAlternateKey("Id", "TenantId")
+                        .HasName("ak_purchase_order_items_id_tenant_id");
+
+                    b.HasAlternateKey("Id", "PurchaseOrderId", "TenantId", "GlobalProductId")
+                        .HasName("ak_purchase_order_items_id_purchase_order_id_tenant_id_global_pr");
+
+                    b.HasIndex("GlobalProductId")
+                        .HasDatabaseName("ix_purchase_order_items_global_product_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_purchase_order_items_tenant_id");
+
+                    b.HasIndex("PurchaseOrderId", "GlobalProductId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_purchase_order_items_order_product");
+
+                    b.HasIndex("PurchaseOrderId", "TenantId")
+                        .HasDatabaseName("ix_purchase_order_items_purchase_order_id_tenant_id");
+
+                    b.HasIndex("TenantId", "StoreId", "GlobalProductId")
+                        .HasDatabaseName("ix_purchase_order_items_tenant_id_store_id_global_product_id");
+
+                    b.ToTable("purchase_order_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_purchase_order_items_ordered_positive", "ordered_quantity > 0");
+
+                            t.HasCheckConstraint("ck_purchase_order_items_received_lte_ordered", "received_quantity <= ordered_quantity");
+
+                            t.HasCheckConstraint("ck_purchase_order_items_received_non_negative", "received_quantity >= 0");
+
+                            t.HasCheckConstraint("ck_purchase_order_items_unit_cost_positive", "unit_cost_amount > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Procurement.Domain.Supplier", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("address");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("ContactName")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("contact_name");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("email");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("TaxIdentification")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("tax_identification");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_suppliers");
+
+                    b.HasAlternateKey("Id", "TenantId")
+                        .HasName("ak_suppliers_id_tenant_id");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("ix_suppliers_is_active");
+
+                    b.HasIndex("TenantId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_suppliers_tenant_code");
+
+                    b.ToTable("suppliers", (string)null);
                 });
 
             modelBuilder.Entity("Chevrere.Modules.Subscriptions.Domain.Plan", b =>
@@ -1456,6 +1915,142 @@ namespace Chevrere.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_store_product_prices_store_products_tenant_id_store_id_glob");
                 });
 
+            modelBuilder.Entity("Chevrere.Modules.Procurement.Domain.GoodsReceipt", b =>
+                {
+                    b.HasOne("Chevrere.Modules.Tenancy.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_goods_receipts_tenants_tenant_id");
+
+                    b.HasOne("Chevrere.Modules.Procurement.Domain.PurchaseOrder", null)
+                        .WithMany()
+                        .HasForeignKey("PurchaseOrderId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_goods_receipts_purchase_orders_purchase_order_id_tenant_id");
+
+                    b.HasOne("Chevrere.Modules.Tenancy.Domain.Store", null)
+                        .WithMany()
+                        .HasForeignKey("StoreId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_goods_receipts_stores_store_id_tenant_id");
+
+                    b.HasOne("Chevrere.Modules.Procurement.Domain.Supplier", null)
+                        .WithMany()
+                        .HasForeignKey("SupplierId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_goods_receipts_suppliers_supplier_id_tenant_id");
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Procurement.Domain.GoodsReceiptItem", b =>
+                {
+                    b.HasOne("Chevrere.Modules.Catalog.Domain.GlobalProduct", null)
+                        .WithMany()
+                        .HasForeignKey("GlobalProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_goods_receipt_items_global_products_global_product_id");
+
+                    b.HasOne("Chevrere.Modules.Tenancy.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_goods_receipt_items_tenants_tenant_id");
+
+                    b.HasOne("Chevrere.Modules.Procurement.Domain.GoodsReceipt", null)
+                        .WithMany("Items")
+                        .HasForeignKey("GoodsReceiptId", "PurchaseOrderId", "TenantId")
+                        .HasPrincipalKey("Id", "PurchaseOrderId", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_goods_receipt_items_goods_receipts_goods_receipt_id_purchas");
+
+                    b.HasOne("Chevrere.Modules.Procurement.Domain.PurchaseOrderItem", null)
+                        .WithMany()
+                        .HasForeignKey("PurchaseOrderItemId", "PurchaseOrderId", "TenantId", "GlobalProductId")
+                        .HasPrincipalKey("Id", "PurchaseOrderId", "TenantId", "GlobalProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_goods_receipt_items_purchase_order_items_purchase_order_ite");
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Procurement.Domain.PurchaseOrder", b =>
+                {
+                    b.HasOne("Chevrere.Modules.Tenancy.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_purchase_orders_tenants_tenant_id");
+
+                    b.HasOne("Chevrere.Modules.Tenancy.Domain.Store", null)
+                        .WithMany()
+                        .HasForeignKey("StoreId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_purchase_orders_stores_store_id_tenant_id");
+
+                    b.HasOne("Chevrere.Modules.Procurement.Domain.Supplier", null)
+                        .WithMany()
+                        .HasForeignKey("SupplierId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_purchase_orders_suppliers_supplier_id_tenant_id");
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Procurement.Domain.PurchaseOrderItem", b =>
+                {
+                    b.HasOne("Chevrere.Modules.Catalog.Domain.GlobalProduct", null)
+                        .WithMany()
+                        .HasForeignKey("GlobalProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_purchase_order_items_global_products_global_product_id");
+
+                    b.HasOne("Chevrere.Modules.Tenancy.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_purchase_order_items_tenants_tenant_id");
+
+                    b.HasOne("Chevrere.Modules.Procurement.Domain.PurchaseOrder", null)
+                        .WithMany("Items")
+                        .HasForeignKey("PurchaseOrderId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_purchase_order_items_purchase_orders_purchase_order_id_tena");
+
+                    b.HasOne("Chevrere.Modules.Catalog.Domain.StoreProduct", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "StoreId", "GlobalProductId")
+                        .HasPrincipalKey("TenantId", "StoreId", "GlobalProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_purchase_order_items_store_products_tenant_id_store_id_glob");
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Procurement.Domain.Supplier", b =>
+                {
+                    b.HasOne("Chevrere.Modules.Tenancy.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_suppliers_tenants_tenant_id");
+                });
+
             modelBuilder.Entity("Chevrere.Modules.Subscriptions.Domain.Subscription", b =>
                 {
                     b.HasOne("Chevrere.Modules.Subscriptions.Domain.Plan", null)
@@ -1556,6 +2151,16 @@ namespace Chevrere.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_user_tokens_users_user_id");
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Procurement.Domain.GoodsReceipt", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Procurement.Domain.PurchaseOrder", b =>
+                {
+                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }

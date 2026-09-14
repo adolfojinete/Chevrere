@@ -1,11 +1,11 @@
 using Chevrere.Modules.Pricing.Application.Abstractions;
 using Chevrere.Modules.Pricing.Application.Contracts;
 using Chevrere.Modules.Pricing.Domain;
-using Chevrere.Modules.Pricing.Domain.ValueObjects;
 using Chevrere.SharedKernel.Application;
 using Chevrere.SharedKernel.Audit;
 using Chevrere.SharedKernel.Context;
 using Chevrere.SharedKernel.Domain;
+using Chevrere.SharedKernel.Domain.ValueObjects;
 using Chevrere.SharedKernel.Persistence;
 using Chevrere.SharedKernel.Results;
 using Chevrere.SharedKernel.Time;

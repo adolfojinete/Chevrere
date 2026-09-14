@@ -31,4 +31,13 @@ public static class AuditActions
     public const string InventoryInitialized = "inventory.initialized";
     public const string InventoryAdjusted = "inventory.adjusted";
     public const string InventoryWasteRecorded = "inventory.waste_recorded";
+    public const string SupplierCreated = "supplier.created";
+    public const string SupplierUpdated = "supplier.updated";
+    public const string SupplierActivated = "supplier.activated";
+    public const string SupplierDeactivated = "supplier.deactivated";
+    public const string PurchaseOrderCreated = "purchase_order.created";
+    public const string PurchaseOrderUpdated = "purchase_order.updated";
+    public const string PurchaseOrderApproved = "purchase_order.approved";
+    public const string PurchaseOrderCancelled = "purchase_order.cancelled";
+    public const string GoodsReceiptRecorded = "goods_receipt.recorded";
 }

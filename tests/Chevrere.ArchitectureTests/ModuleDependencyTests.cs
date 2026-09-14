@@ -11,6 +11,9 @@ using Chevrere.Modules.Inventory.Infrastructure;
 using Chevrere.Modules.Pricing.Application;
 using Chevrere.Modules.Pricing.Domain;
 using Chevrere.Modules.Pricing.Infrastructure;
+using Chevrere.Modules.Procurement.Application;
+using Chevrere.Modules.Procurement.Domain;
+using Chevrere.Modules.Procurement.Infrastructure;
 using Chevrere.Modules.Subscriptions.Application;
 using Chevrere.Modules.Subscriptions.Domain;
 using Chevrere.Modules.Subscriptions.Infrastructure;
@@ -35,6 +38,7 @@ public sealed class ModuleDependencyTests
             typeof(Category).Assembly,
             typeof(GlobalProductPrice).Assembly,
             typeof(InventoryItem).Assembly,
+            typeof(PurchaseOrder).Assembly,
             typeof(Entity).Assembly
         };
 
@@ -56,7 +60,9 @@ public sealed class ModuleDependencyTests
                     "Chevrere.Modules.Pricing.Application",
                     "Chevrere.Modules.Pricing.Infrastructure",
                     "Chevrere.Modules.Inventory.Application",
-                    "Chevrere.Modules.Inventory.Infrastructure")
+                    "Chevrere.Modules.Inventory.Infrastructure",
+                    "Chevrere.Modules.Procurement.Application",
+                    "Chevrere.Modules.Procurement.Infrastructure")
                 .GetResult();
 
             Assert.True(result.IsSuccessful, Format(result));
@@ -73,7 +79,8 @@ public sealed class ModuleDependencyTests
             typeof(SubscriptionsApplicationExtensions).Assembly,
             typeof(CatalogApplicationExtensions).Assembly,
             typeof(PricingApplicationExtensions).Assembly,
-            typeof(InventoryApplicationExtensions).Assembly
+            typeof(InventoryApplicationExtensions).Assembly,
+            typeof(ProcurementApplicationExtensions).Assembly
         };
 
         foreach (var assembly in assemblies)
@@ -88,7 +95,8 @@ public sealed class ModuleDependencyTests
                     "Chevrere.Modules.Subscriptions.Infrastructure",
                     "Chevrere.Modules.Catalog.Infrastructure",
                     "Chevrere.Modules.Pricing.Infrastructure",
-                    "Chevrere.Modules.Inventory.Infrastructure")
+                    "Chevrere.Modules.Inventory.Infrastructure",
+                    "Chevrere.Modules.Procurement.Infrastructure")
                 .GetResult();
 
             Assert.True(result.IsSuccessful, Format(result));
@@ -204,6 +212,95 @@ public sealed class ModuleDependencyTests
     }
 
     [Fact]
+    public void Procurement_domain_does_not_depend_on_other_modules()
+    {
+        var result = Types.InAssembly(typeof(PurchaseOrder).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "Chevrere.Api",
+                "Chevrere.Infrastructure",
+                "Chevrere.Modules.Catalog.Application",
+                "Chevrere.Modules.Catalog.Domain",
+                "Chevrere.Modules.Catalog.Infrastructure",
+                "Chevrere.Modules.Pricing.Application",
+                "Chevrere.Modules.Pricing.Domain",
+                "Chevrere.Modules.Pricing.Infrastructure",
+                "Chevrere.Modules.Inventory.Application",
+                "Chevrere.Modules.Inventory.Domain",
+                "Chevrere.Modules.Inventory.Infrastructure",
+                "Chevrere.Modules.Tenancy.Application",
+                "Chevrere.Modules.Tenancy.Domain",
+                "Chevrere.Modules.Tenancy.Infrastructure")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, Format(result));
+    }
+
+    /// <summary>
+    /// Procurement moves stock through the SharedKernel inbound contract only. Taking a reference to
+    /// Inventory, Catalog or Pricing would turn two modules into one.
+    /// </summary>
+    [Fact]
+    public void Procurement_application_reaches_inventory_only_through_shared_kernel()
+    {
+        var result = Types.InAssembly(typeof(ProcurementApplicationExtensions).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "Chevrere.Api",
+                "Chevrere.Infrastructure",
+                "Chevrere.Modules.Catalog.Application",
+                "Chevrere.Modules.Catalog.Domain",
+                "Chevrere.Modules.Catalog.Infrastructure",
+                "Chevrere.Modules.Pricing.Application",
+                "Chevrere.Modules.Pricing.Domain",
+                "Chevrere.Modules.Pricing.Infrastructure",
+                "Chevrere.Modules.Inventory.Application",
+                "Chevrere.Modules.Inventory.Domain",
+                "Chevrere.Modules.Inventory.Infrastructure",
+                "Chevrere.Modules.Tenancy.Application",
+                "Chevrere.Modules.Tenancy.Domain",
+                "Chevrere.Modules.Tenancy.Infrastructure")
+            .GetResult();
+
+        var usesContract = Types.InAssembly(typeof(ProcurementApplicationExtensions).Assembly)
+            .That()
+            .HaveNameEndingWith("ReceiveGoodsHandler")
+            .Should()
+            .HaveDependencyOn("Chevrere.SharedKernel.Inventory")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, Format(result));
+        Assert.True(usesContract.IsSuccessful, Format(usesContract));
+    }
+
+    /// <summary>
+    /// Inventory must not learn about its callers: the inbound contract lives in SharedKernel.
+    /// </summary>
+    [Fact]
+    public void Inventory_does_not_depend_on_procurement()
+    {
+        var assemblies = new[]
+        {
+            typeof(InventoryItem).Assembly,
+            typeof(InventoryApplicationExtensions).Assembly,
+            typeof(InventoryInfrastructureExtensions).Assembly
+        };
+
+        foreach (var assembly in assemblies)
+        {
+            var result = Types.InAssembly(assembly)
+                .ShouldNot()
+                .HaveDependencyOnAny(
+                    "Chevrere.Modules.Procurement.Application",
+                    "Chevrere.Modules.Procurement.Domain",
+                    "Chevrere.Modules.Procurement.Infrastructure")
+                .GetResult();
+
+            Assert.True(result.IsSuccessful, Format(result));
+        }
+    }
+
+    [Fact]
     public void Module_infrastructure_does_not_depend_on_api()
     {
         var assemblies = new[]
@@ -213,7 +310,8 @@ public sealed class ModuleDependencyTests
             typeof(SubscriptionsInfrastructureExtensions).Assembly,
             typeof(CatalogInfrastructureExtensions).Assembly,
             typeof(PricingInfrastructureExtensions).Assembly,
-            typeof(InventoryInfrastructureExtensions).Assembly
+            typeof(InventoryInfrastructureExtensions).Assembly,
+            typeof(ProcurementInfrastructureExtensions).Assembly
         };
 
         foreach (var assembly in assemblies)

@@ -1,5 +1,5 @@
 using Chevrere.Modules.Pricing.Application.Contracts;
-using Chevrere.Modules.Pricing.Domain.ValueObjects;
+using Chevrere.SharedKernel.Domain.ValueObjects;
 using FluentValidation;
 
 namespace Chevrere.Modules.Pricing.Application.Validators;

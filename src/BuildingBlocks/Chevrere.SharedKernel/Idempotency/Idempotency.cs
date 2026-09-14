@@ -9,6 +9,8 @@ public static class IdempotencyOperations
     public const string InventoryInitialize = "inventory.initialize";
     public const string InventoryAdjust = "inventory.adjust";
     public const string InventoryWaste = "inventory.waste";
+    public const string ProcurementPurchaseOrderCreate = "procurement.purchase_order.create";
+    public const string ProcurementReceive = "procurement.receive";
 }
 
 public static class IdempotencyKeyRules
@@ -26,6 +28,8 @@ public static class IdempotencyKeyRules
 public static class IdempotencyFingerprint
 {
     public static string Format(long value) => value.ToString(CultureInfo.InvariantCulture);
+
+    public static string Format(decimal value) => value.ToString("F2", CultureInfo.InvariantCulture);
 
     public static string Sha256(params string?[] parts)
     {

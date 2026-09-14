@@ -2,7 +2,7 @@
 
 Plataforma SaaS + quick-commerce sobre una red de dark stores independientes.
 
-Esta fase entrega la fundación técnica, la administración central de asociados, el catálogo comercial, pricing e inventario: onboarding atómico de Tenant, Franchisee, Owner, primera Store, Plan y Subscription; ciclo de vida (activar, suspender, reactivar) sin borrar datos; catálogo global Chevrere y habilitación por dark store; precio sugerido global y override por Store; ledger de inventario por dark store; auditoría; multi-tenancy; y autenticación de plataforma.
+Esta fase entrega la fundación técnica, la administración central de asociados, el catálogo comercial, pricing, inventario y abastecimiento: onboarding atómico de Tenant, Franchisee, Owner, primera Store, Plan y Subscription; ciclo de vida (activar, suspender, reactivar) sin borrar datos; catálogo global Chevrere y habilitación por dark store; precio sugerido global y override por Store; ledger de inventario por dark store; proveedores, órdenes de compra y recepción de mercancía que alimenta ese ledger; auditoría; multi-tenancy; y autenticación de plataforma.
 
 ## Objetivo
 
@@ -25,7 +25,8 @@ Chevrere
 │       ├── Subscriptions(Domain / Application / Infrastructure)
 │       ├── Catalog      (Domain / Application / Infrastructure)
 │       ├── Pricing      (Domain / Application / Infrastructure)
-│       └── Inventory    (Domain / Application / Infrastructure)
+│       ├── Inventory    (Domain / Application / Infrastructure)
+│       └── Procurement  (Domain / Application / Infrastructure)
 ├── tests
 │   ├── Chevrere.UnitTests
 │   ├── Chevrere.IntegrationTests
@@ -147,6 +148,11 @@ dotnet run --project src\Chevrere.Api
 14. Owner → `PUT/GET/DELETE /api/v1/business/stores/{storeId}/products/{productId}/price`
 15. Owner → inventory list/get/movements + initialize/adjustments/waste (header `Idempotency-Key`)
 16. Admin lectura → `GET /api/v1/admin/stores/{storeId}/inventory`
+17. Owner → `POST /api/v1/business/suppliers`
+18. Owner → `POST /api/v1/business/stores/{storeId}/purchase-orders` (header `Idempotency-Key`)
+19. Owner → `POST .../purchase-orders/{id}/approve`
+20. Owner → `POST .../purchase-orders/{id}/receipts` (header `Idempotency-Key`) → mueve stock
+21. Admin lectura → `GET /api/v1/admin/stores/{storeId}/purchase-orders` y `.../goods-receipts/{receiptId}`
 
 ## Tests
 
@@ -181,6 +187,9 @@ La solución incluye `SonarAnalyzer.CSharp` (el mismo motor de reglas que SonarQ
 - `FranchiseeStatus` ≠ `SubscriptionStatus`.
 - Suspender no elimina.
 - Consumer Payment ≠ SaaS Subscription.
+- `Money` vive en SharedKernel: el costo de compra y el precio de venta son el mismo concepto.
+- Números de documento (`PO-`, `GR-`) desde secuencias PostgreSQL: únicos, no necesariamente consecutivos.
+- Procurement mueve stock por un puerto de SharedKernel; no referencia Inventory.
 
 ## Documentación
 
@@ -192,3 +201,4 @@ La solución incluye `SonarAnalyzer.CSharp` (el mismo motor de reglas que SonarQ
 - [docs/adr/ADR-005-global-catalog-store-catalog.md](docs/adr/ADR-005-global-catalog-store-catalog.md)
 - [docs/adr/ADR-006-pricing-global-suggested-store-override.md](docs/adr/ADR-006-pricing-global-suggested-store-override.md)
 - [docs/adr/ADR-007-inventory-ledger-and-balances.md](docs/adr/ADR-007-inventory-ledger-and-balances.md)
+- [docs/adr/ADR-008-procurement-purchase-orders-and-goods-receipts.md](docs/adr/ADR-008-procurement-purchase-orders-and-goods-receipts.md)

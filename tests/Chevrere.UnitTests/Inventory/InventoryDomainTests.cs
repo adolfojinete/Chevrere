@@ -1,6 +1,7 @@
 using System.Reflection;
 using Chevrere.Modules.Inventory.Domain;
 using Chevrere.SharedKernel.Domain;
+using Chevrere.SharedKernel.Inventory;
 
 namespace Chevrere.UnitTests.Inventory;
 
@@ -116,6 +117,88 @@ public sealed class InventoryDomainTests
         Assert.ThrowsAny<OverflowException>(() =>
             item.Increase(1, "overflow", ActorId, "corr", FixedClock.Now));
         Assert.Equal(long.MaxValue, item.OnHand);
+    }
+
+    [Fact]
+    public void CreateForReceipt_starts_empty_without_a_movement()
+    {
+        var item = InventoryItem.CreateForReceipt(TenantId, StoreId, ProductId, FixedClock.Now);
+
+        Assert.Equal(TenantId, item.TenantId);
+        Assert.Equal(StoreId, item.StoreId);
+        Assert.Equal(ProductId, item.GlobalProductId);
+        Assert.Equal(0, item.OnHand);
+        Assert.Equal(0, item.Available);
+    }
+
+    [Fact]
+    public void Receive_posts_a_receipt_movement_carrying_its_reference()
+    {
+        var item = InventoryItem.CreateForReceipt(TenantId, StoreId, ProductId, FixedClock.Now);
+        var receiptItemId = Guid.CreateVersion7();
+
+        var movement = item.Receive(
+            25, InventoryReferenceTypes.GoodsReceiptItem, receiptItemId, ActorId, "corr-r", FixedClock.Now);
+
+        Assert.Equal(InventoryMovementType.Receipt, movement.Type);
+        Assert.Equal(InventoryReferenceTypes.GoodsReceiptItem, movement.ReferenceType);
+        Assert.Equal(receiptItemId, movement.ReferenceId);
+        Assert.Equal(0, movement.OnHandBefore);
+        Assert.Equal(25, movement.OnHandAfter);
+        Assert.Equal(25, movement.OnHandDelta);
+        Assert.Equal(0, movement.ReservedDelta);
+        Assert.Null(movement.Reason);
+        Assert.Equal(25, item.OnHand);
+        Assert.Equal(25, item.Available);
+    }
+
+    [Fact]
+    public void Receive_adds_on_top_of_existing_stock_without_touching_reservations()
+    {
+        var (item, _) = InventoryItem.Initialize(
+            TenantId, StoreId, ProductId, 40, ActorId, "corr", FixedClock.Now);
+        SetPrivate(item, nameof(InventoryItem.Reserved), 10L);
+
+        var movement = item.Receive(
+            15, InventoryReferenceTypes.GoodsReceiptItem, Guid.CreateVersion7(), ActorId, "corr", FixedClock.Now);
+
+        Assert.Equal(40, movement.OnHandBefore);
+        Assert.Equal(55, movement.OnHandAfter);
+        Assert.Equal(10, movement.ReservedBefore);
+        Assert.Equal(10, movement.ReservedAfter);
+        Assert.Equal(55, item.OnHand);
+        Assert.Equal(45, item.Available);
+    }
+
+    [Fact]
+    public void Receive_requires_positive_quantity_and_a_reference()
+    {
+        var item = InventoryItem.CreateForReceipt(TenantId, StoreId, ProductId, FixedClock.Now);
+        var referenceId = Guid.CreateVersion7();
+
+        Assert.Equal("inventory.quantity.invalid", Assert.Throws<DomainException>(() => item.Receive(
+            0, InventoryReferenceTypes.GoodsReceiptItem, referenceId, ActorId, "corr", FixedClock.Now)).Code);
+        Assert.Equal("inventory.quantity.invalid", Assert.Throws<DomainException>(() => item.Receive(
+            -5, InventoryReferenceTypes.GoodsReceiptItem, referenceId, ActorId, "corr", FixedClock.Now)).Code);
+        Assert.Equal("inventory.reference.required", Assert.Throws<DomainException>(() => item.Receive(
+            5, InventoryReferenceTypes.GoodsReceiptItem, Guid.Empty, ActorId, "corr", FixedClock.Now)).Code);
+        Assert.Throws<DomainException>(() => item.Receive(5, " ", referenceId, ActorId, "corr", FixedClock.Now));
+
+        Assert.Equal(0, item.OnHand);
+    }
+
+    [Fact]
+    public void Manual_movements_carry_no_reference()
+    {
+        var (item, initial) = InventoryItem.Initialize(
+            TenantId, StoreId, ProductId, 10, ActorId, "corr", FixedClock.Now);
+
+        Assert.Null(initial!.ReferenceType);
+        Assert.Null(initial.ReferenceId);
+
+        var increase = item.Increase(1, "Conteo", ActorId, "corr", FixedClock.Now);
+        Assert.Null(increase.ReferenceType);
+        Assert.Null(increase.ReferenceId);
     }
 
     private static void SetPrivate(object target, string propertyName, object value)

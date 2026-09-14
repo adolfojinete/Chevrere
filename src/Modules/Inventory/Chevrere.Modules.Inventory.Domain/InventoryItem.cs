@@ -48,6 +48,17 @@ public sealed class InventoryItem : AggregateRoot
     }
 
     /// <summary>
+    /// Creates a zero-balance item so an inbound flow (goods receipt) can post its first movement.
+    /// Unlike Initialize, it never produces an InitialStock movement.
+    /// </summary>
+    public static InventoryItem CreateForReceipt(
+        Guid tenantId,
+        Guid storeId,
+        Guid globalProductId,
+        DateTimeOffset utcNow) =>
+        CreateUninitialized(tenantId, storeId, globalProductId, utcNow);
+
+    /// <summary>
     /// Creates the item and optionally an InitialStock movement when quantity &gt; 0.
     /// Initialize(0) creates the item without a zero-delta movement.
     /// </summary>
@@ -76,6 +87,8 @@ public sealed class InventoryItem : AggregateRoot
             onHandDelta: quantity,
             reservedDelta: 0,
             reason: null,
+            referenceType: null,
+            referenceId: null,
             actorUserId,
             correlationId,
             utcNow);
@@ -90,6 +103,38 @@ public sealed class InventoryItem : AggregateRoot
             onHandDelta: quantity,
             reservedDelta: 0,
             reason: RequireReason(reason),
+            referenceType: null,
+            referenceId: null,
+            actorUserId,
+            correlationId,
+            utcNow);
+    }
+
+    /// <summary>
+    /// Inbound stock from an external document (goods receipt). The reference makes the
+    /// ledger entry traceable and lets the database reject a duplicated posting.
+    /// </summary>
+    public InventoryMovement Receive(
+        long quantity,
+        string referenceType,
+        Guid referenceId,
+        Guid? actorUserId,
+        string correlationId,
+        DateTimeOffset utcNow)
+    {
+        EnsurePositiveQuantity(quantity);
+        if (referenceId == Guid.Empty)
+        {
+            throw new DomainException("inventory.reference.required", "A receipt movement requires a reference.");
+        }
+
+        return Apply(
+            InventoryMovementType.Receipt,
+            onHandDelta: quantity,
+            reservedDelta: 0,
+            reason: null,
+            referenceType: Guard.NotNullOrWhiteSpace(referenceType, nameof(referenceType), 64),
+            referenceId: referenceId,
             actorUserId,
             correlationId,
             utcNow);
@@ -103,6 +148,8 @@ public sealed class InventoryItem : AggregateRoot
             onHandDelta: checked(-quantity),
             reservedDelta: 0,
             reason: RequireReason(reason),
+            referenceType: null,
+            referenceId: null,
             actorUserId,
             correlationId,
             utcNow);
@@ -116,6 +163,8 @@ public sealed class InventoryItem : AggregateRoot
             onHandDelta: checked(-quantity),
             reservedDelta: 0,
             reason: RequireReason(reason),
+            referenceType: null,
+            referenceId: null,
             actorUserId,
             correlationId,
             utcNow);
@@ -126,6 +175,8 @@ public sealed class InventoryItem : AggregateRoot
         long onHandDelta,
         long reservedDelta,
         string? reason,
+        string? referenceType,
+        Guid? referenceId,
         Guid? actorUserId,
         string correlationId,
         DateTimeOffset utcNow)
@@ -141,6 +192,8 @@ public sealed class InventoryItem : AggregateRoot
             onHandDelta,
             reservedDelta,
             reason,
+            referenceType,
+            referenceId,
             actorUserId,
             correlationId,
             utcNow);
