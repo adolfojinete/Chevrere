@@ -2,6 +2,9 @@ using Chevrere.Infrastructure;
 using Chevrere.Modules.Catalog.Application;
 using Chevrere.Modules.Catalog.Domain;
 using Chevrere.Modules.Catalog.Infrastructure;
+using Chevrere.Modules.Consumer.Application;
+using Chevrere.Modules.Consumer.Domain;
+using Chevrere.Modules.Consumer.Infrastructure;
 using Chevrere.Modules.Identity.Application;
 using Chevrere.Modules.Identity.Domain;
 using Chevrere.Modules.Identity.Infrastructure;
@@ -39,6 +42,7 @@ public sealed class ModuleDependencyTests
             typeof(GlobalProductPrice).Assembly,
             typeof(InventoryItem).Assembly,
             typeof(PurchaseOrder).Assembly,
+            typeof(StoreServiceArea).Assembly,
             typeof(Entity).Assembly
         };
 
@@ -62,7 +66,9 @@ public sealed class ModuleDependencyTests
                     "Chevrere.Modules.Inventory.Application",
                     "Chevrere.Modules.Inventory.Infrastructure",
                     "Chevrere.Modules.Procurement.Application",
-                    "Chevrere.Modules.Procurement.Infrastructure")
+                    "Chevrere.Modules.Procurement.Infrastructure",
+                    "Chevrere.Modules.Consumer.Application",
+                    "Chevrere.Modules.Consumer.Infrastructure")
                 .GetResult();
 
             Assert.True(result.IsSuccessful, Format(result));
@@ -80,7 +86,8 @@ public sealed class ModuleDependencyTests
             typeof(CatalogApplicationExtensions).Assembly,
             typeof(PricingApplicationExtensions).Assembly,
             typeof(InventoryApplicationExtensions).Assembly,
-            typeof(ProcurementApplicationExtensions).Assembly
+            typeof(ProcurementApplicationExtensions).Assembly,
+            typeof(ConsumerApplicationExtensions).Assembly
         };
 
         foreach (var assembly in assemblies)
@@ -96,7 +103,8 @@ public sealed class ModuleDependencyTests
                     "Chevrere.Modules.Catalog.Infrastructure",
                     "Chevrere.Modules.Pricing.Infrastructure",
                     "Chevrere.Modules.Inventory.Infrastructure",
-                    "Chevrere.Modules.Procurement.Infrastructure")
+                    "Chevrere.Modules.Procurement.Infrastructure",
+                    "Chevrere.Modules.Consumer.Infrastructure")
                 .GetResult();
 
             Assert.True(result.IsSuccessful, Format(result));
@@ -300,6 +308,65 @@ public sealed class ModuleDependencyTests
         }
     }
 
+    /// <summary>
+    /// Consumer Discovery composes Catalog, Pricing, Inventory and Tenancy, but only in Infrastructure.
+    /// A reference from its Domain or Application would turn the consumer surface into a second copy
+    /// of the whole back office.
+    /// </summary>
+    [Fact]
+    public void Consumer_domain_and_application_do_not_depend_on_other_modules()
+    {
+        var assemblies = new[]
+        {
+            typeof(StoreServiceArea).Assembly,
+            typeof(ConsumerApplicationExtensions).Assembly
+        };
+
+        foreach (var assembly in assemblies)
+        {
+            var result = Types.InAssembly(assembly)
+                .ShouldNot()
+                .HaveDependencyOnAny(
+                    "Chevrere.Api",
+                    "Chevrere.Infrastructure",
+                    "Chevrere.Modules.Catalog.Application",
+                    "Chevrere.Modules.Catalog.Domain",
+                    "Chevrere.Modules.Catalog.Infrastructure",
+                    "Chevrere.Modules.Pricing.Application",
+                    "Chevrere.Modules.Pricing.Domain",
+                    "Chevrere.Modules.Pricing.Infrastructure",
+                    "Chevrere.Modules.Inventory.Application",
+                    "Chevrere.Modules.Inventory.Domain",
+                    "Chevrere.Modules.Inventory.Infrastructure",
+                    "Chevrere.Modules.Procurement.Application",
+                    "Chevrere.Modules.Procurement.Domain",
+                    "Chevrere.Modules.Procurement.Infrastructure",
+                    "Chevrere.Modules.Tenancy.Application",
+                    "Chevrere.Modules.Tenancy.Domain",
+                    "Chevrere.Modules.Tenancy.Infrastructure")
+                .GetResult();
+
+            Assert.True(result.IsSuccessful, Format(result));
+        }
+    }
+
+    /// <summary>
+    /// NetTopologySuite is a persistence detail. The domain reasons about latitude and longitude.
+    /// </summary>
+    [Fact]
+    public void Consumer_domain_does_not_depend_on_spatial_or_persistence_libraries()
+    {
+        var result = Types.InAssembly(typeof(StoreServiceArea).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "NetTopologySuite",
+                "Npgsql",
+                "Microsoft.EntityFrameworkCore")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, Format(result));
+    }
+
     [Fact]
     public void Module_infrastructure_does_not_depend_on_api()
     {
@@ -311,7 +378,8 @@ public sealed class ModuleDependencyTests
             typeof(CatalogInfrastructureExtensions).Assembly,
             typeof(PricingInfrastructureExtensions).Assembly,
             typeof(InventoryInfrastructureExtensions).Assembly,
-            typeof(ProcurementInfrastructureExtensions).Assembly
+            typeof(ProcurementInfrastructureExtensions).Assembly,
+            typeof(ConsumerInfrastructureExtensions).Assembly
         };
 
         foreach (var assembly in assemblies)

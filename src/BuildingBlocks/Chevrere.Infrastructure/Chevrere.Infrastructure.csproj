@@ -17,6 +17,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Chevrere.SharedKernel\Chevrere.SharedKernel.csproj" />
@@ -24,6 +25,7 @@
     <ProjectReference Include="..\..\Modules\Subscriptions\Chevrere.Modules.Subscriptions.Domain\Chevrere.Modules.Subscriptions.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Tenancy\Chevrere.Modules.Tenancy.Domain\Chevrere.Modules.Tenancy.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Catalog\Chevrere.Modules.Catalog.Domain\Chevrere.Modules.Catalog.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Consumer\Chevrere.Modules.Consumer.Domain\Chevrere.Modules.Consumer.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Pricing\Chevrere.Modules.Pricing.Domain\Chevrere.Modules.Pricing.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Inventory\Chevrere.Modules.Inventory.Domain\Chevrere.Modules.Inventory.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Procurement\Chevrere.Modules.Procurement.Domain\Chevrere.Modules.Procurement.Domain.csproj" />

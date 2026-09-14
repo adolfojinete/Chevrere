@@ -10,7 +10,9 @@ namespace Chevrere.IntegrationTests;
 
 public sealed class ChevrereApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
+    // Must match deploy/docker-compose.yml: the AddConsumerDiscovery migration creates the postgis
+    // extension, which plain postgres:17-alpine does not ship.
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgis/postgis:17-3.5-alpine")
         .WithDatabase("chevrere_test")
         .WithUsername("chevrere")
         .WithPassword("chevrere_test_only")

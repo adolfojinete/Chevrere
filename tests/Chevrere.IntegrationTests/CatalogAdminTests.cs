@@ -96,7 +96,7 @@ public sealed class CatalogAdminTests(ChevrereApiFactory factory)
     {
         var response = await admin.PostAsJsonAsync(
             "/api/v1/admin/products",
-            new CreateGlobalProductRequest(categoryId, sku, name, "Coca-Cola", "1.5 L", null, barcode));
+            new CreateGlobalProductRequest(categoryId, sku, name, "Marca", "1.5 L", null, barcode));
         response.EnsureSuccessStatusCode();
         var product = await response.Content.ReadFromJsonAsync<GlobalProductDto>(AuthHelper.Json);
         Assert.NotNull(product);

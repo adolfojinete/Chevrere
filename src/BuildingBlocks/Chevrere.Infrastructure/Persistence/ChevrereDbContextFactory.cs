@@ -22,7 +22,7 @@ public sealed class ChevrereDbContextFactory : IDesignTimeDbContextFactory<Chevr
             ?? "Host=localhost;Port=5432;Database=chevrere;Username=chevrere;Password=chevrere_dev_only";
 
         var options = new DbContextOptionsBuilder<ChevrereDbContext>()
-            .UseNpgsql(connectionString)
+            .UseNpgsql(connectionString, npgsql => npgsql.UseNetTopologySuite())
             .UseSnakeCaseNamingConvention()
             .Options;
 

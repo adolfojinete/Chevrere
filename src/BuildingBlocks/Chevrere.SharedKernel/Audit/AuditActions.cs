@@ -40,4 +40,7 @@ public static class AuditActions
     public const string PurchaseOrderApproved = "purchase_order.approved";
     public const string PurchaseOrderCancelled = "purchase_order.cancelled";
     public const string GoodsReceiptRecorded = "goods_receipt.recorded";
+    public const string StoreServiceAreaConfigured = "store_service_area.configured";
+    public const string StoreServiceAreaEnabled = "store_service_area.enabled";
+    public const string StoreServiceAreaDisabled = "store_service_area.disabled";
 }

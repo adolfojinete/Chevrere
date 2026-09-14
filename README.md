@@ -2,7 +2,7 @@
 
 Plataforma SaaS + quick-commerce sobre una red de dark stores independientes.
 
-Esta fase entrega la fundación técnica, la administración central de asociados, el catálogo comercial, pricing, inventario y abastecimiento: onboarding atómico de Tenant, Franchisee, Owner, primera Store, Plan y Subscription; ciclo de vida (activar, suspender, reactivar) sin borrar datos; catálogo global Chevrere y habilitación por dark store; precio sugerido global y override por Store; ledger de inventario por dark store; proveedores, órdenes de compra y recepción de mercancía que alimenta ese ledger; auditoría; multi-tenancy; y autenticación de plataforma.
+Esta fase entrega la fundación técnica, la administración central de asociados, el catálogo comercial, pricing, inventario, abastecimiento y discovery hacia el consumidor: onboarding atómico de Tenant, Franchisee, Owner, primera Store, Plan y Subscription; ciclo de vida (activar, suspender, reactivar) sin borrar datos; catálogo global Chevrere y habilitación por dark store; precio sugerido global y override por Store; ledger de inventario por dark store; proveedores, órdenes de compra y recepción de mercancía; cobertura geolocalizada (PostGIS) y catálogo comercial anónimo; auditoría; multi-tenancy; y autenticación de plataforma.
 
 ## Objetivo
 
@@ -26,7 +26,8 @@ Chevrere
 │       ├── Catalog      (Domain / Application / Infrastructure)
 │       ├── Pricing      (Domain / Application / Infrastructure)
 │       ├── Inventory    (Domain / Application / Infrastructure)
-│       └── Procurement  (Domain / Application / Infrastructure)
+│       ├── Procurement  (Domain / Application / Infrastructure)
+│       └── Consumer     (Domain / Application / Infrastructure)
 ├── tests
 │   ├── Chevrere.UnitTests
 │   ├── Chevrere.IntegrationTests
@@ -40,16 +41,17 @@ Detalle: [docs/architecture.md](docs/architecture.md).
 ## Requisitos
 
 - .NET SDK 10.0.401 o superior (feature band 10.0)
-- Docker (PostgreSQL local y tests de integración)
+- Docker (**PostGIS** local y tests de integración — imagen `postgis/postgis:17-3.5-alpine`)
 - Herramientas EF Core: `dotnet tool install --global dotnet-ef`
 
-## PostgreSQL local
+## PostgreSQL local (PostGIS)
 
 ```powershell
 cd C:\Users\adolf\source\repos\Chevrere\deploy
 docker compose up -d
 ```
 
+La imagen es PostGIS (`postgis/postgis:17-3.5-alpine`), no Postgres plano: Consumer Discovery resuelve cobertura con `geography(Point,4326)`.
 Valores de desarrollo (no son credenciales de producción):
 
 - Host: `localhost`
@@ -153,6 +155,8 @@ dotnet run --project src\Chevrere.Api
 19. Owner → `POST .../purchase-orders/{id}/approve`
 20. Owner → `POST .../purchase-orders/{id}/receipts` (header `Idempotency-Key`) → mueve stock
 21. Admin lectura → `GET /api/v1/admin/stores/{storeId}/purchase-orders` y `.../goods-receipts/{receiptId}`
+22. Admin → `PUT /api/v1/admin/stores/{storeId}/service-area` + `.../enable`
+23. Anónimo → `POST /api/v1/consumer/coverage` y `POST /api/v1/consumer/catalog/search` (lat/lon en body)
 
 ## Tests
 
@@ -160,7 +164,7 @@ dotnet run --project src\Chevrere.Api
 dotnet test
 ```
 
-Los tests de integración levantan PostgreSQL con Testcontainers. Docker debe estar en ejecución.
+Los tests de integración levantan **PostGIS** con Testcontainers (`postgis/postgis:17-3.5-alpine`). Docker debe estar en ejecución.
 
 ```powershell
 dotnet test --collect:"XPlat Code Coverage"
@@ -190,6 +194,8 @@ La solución incluye `SonarAnalyzer.CSharp` (el mismo motor de reglas que SonarQ
 - `Money` vive en SharedKernel: el costo de compra y el precio de venta son el mismo concepto.
 - Números de documento (`PO-`, `GR-`) desde secuencias PostgreSQL: únicos, no necesariamente consecutivos.
 - Procurement mueve stock por un puerto de SharedKernel; no referencia Inventory.
+- Área de servicio (`StoreServiceArea`) ≠ dirección operativa de la Store; APIs de consumidor no filtran store/tenant/stock/coords.
+- Radio de entrega 100..50 000 m (decisión de producto). Suscripción SaaS más allá de `Tenant.Status` = Decision Pending.
 
 ## Documentación
 
@@ -202,3 +208,4 @@ La solución incluye `SonarAnalyzer.CSharp` (el mismo motor de reglas que SonarQ
 - [docs/adr/ADR-006-pricing-global-suggested-store-override.md](docs/adr/ADR-006-pricing-global-suggested-store-override.md)
 - [docs/adr/ADR-007-inventory-ledger-and-balances.md](docs/adr/ADR-007-inventory-ledger-and-balances.md)
 - [docs/adr/ADR-008-procurement-purchase-orders-and-goods-receipts.md](docs/adr/ADR-008-procurement-purchase-orders-and-goods-receipts.md)
+- [docs/adr/ADR-009-consumer-discovery-geolocation-and-catalog.md](docs/adr/ADR-009-consumer-discovery-geolocation-and-catalog.md)
