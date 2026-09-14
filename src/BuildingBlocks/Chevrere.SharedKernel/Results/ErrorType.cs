@@ -8,5 +8,6 @@ public enum ErrorType
     Domain = 4,
     Unauthorized = 5,
     Forbidden = 6,
-    Concurrency = 7
+    Concurrency = 7,
+    Failure = 8
 }

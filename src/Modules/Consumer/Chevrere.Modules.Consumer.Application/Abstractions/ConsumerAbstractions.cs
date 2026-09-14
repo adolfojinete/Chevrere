@@ -1,25 +1,8 @@
 using Chevrere.Modules.Consumer.Application.Contracts;
 using Chevrere.Modules.Consumer.Domain;
-using Chevrere.Modules.Consumer.Domain.ValueObjects;
+using Chevrere.SharedKernel.Discovery;
 
 namespace Chevrere.Modules.Consumer.Application.Abstractions;
-
-/// <summary>
-/// Internal fulfillment decision. It is never serialized: leaking it would tell a consumer which dark
-/// store and which tenant is behind the single Chevrere brand.
-/// </summary>
-public sealed record ConsumerFulfillmentStore(Guid StoreId, Guid TenantId, Guid ServiceAreaId);
-
-/// <summary>
-/// Picks the one store that serves a coordinate. Coverage, catalog, categories and product detail all
-/// go through it, so the four endpoints can never disagree about who would deliver.
-/// </summary>
-public interface IConsumerStoreResolver
-{
-    Task<ConsumerFulfillmentStore?> ResolveEligibleStoreAsync(
-        GeoCoordinate location,
-        CancellationToken cancellationToken);
-}
 
 /// <summary>
 /// Commercially visible catalog of one resolved store. Composition of Catalog, Pricing and Inventory

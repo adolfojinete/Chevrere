@@ -62,8 +62,9 @@ No hay repositorios genéricos. Cada módulo expone puertos de aplicación (`ITe
 | Inventory | Existencia física por Store: balances + ledger inmutable |
 | Procurement | Proveedores, órdenes de compra y recepción de mercancía |
 | Consumer | Discovery geolocalizado: área de servicio, cobertura y catálogo comercial anónimo |
+| Orders | Carrito del consumidor, pedidos con snapshot comercial y reserva de inventario |
 
-Módulos futuros previstos, no implementados: Orders, Payments, Billing, Operations, Notifications.
+Módulos futuros previstos, no implementados: Payments, Billing, Operations, Notifications.
 
 ## Catálogo
 
@@ -80,9 +81,9 @@ Pricing (Suggested + Store override → EffectivePrice)
    ↓
 Procurement (Supplier → PurchaseOrder → GoodsReceipt)
    ↓
-Inventory (OnHand / Reserved / Available + ledger)
+Inventory (OnHand / Reserved / Available + ledger + InventoryReservation)
    ↓
-Orders   ← futuro
+Orders (Cart → Order + reserva de Available)
 ```
 
 Las flechas describen composición funcional (qué capa responde qué pregunta), no necesariamente project references. Inventory no referencia Pricing ni Catalog Domain; proyecta SKU/Name vía Infrastructure. Procurement no referencia Inventory: mueve stock por el puerto `IInventoryInboundService` de SharedKernel.
@@ -116,7 +117,7 @@ Detalle: [ADR-009](adr/ADR-009-consumer-discovery-geolocation-and-catalog.md).
 
 ## Inventory
 
-Cada Store gestiona stock por `GlobalProduct` ofrecido (`StoreProduct`). El estado actual vive en `InventoryItem` (`OnHand`, `Reserved`); la historia en `InventoryMovement` inmutable. `Available` se deriva. Mutaciones manuales (Initialize / Adjust / Waste) exigen `Idempotency-Key`. Detalle: [ADR-007](adr/ADR-007-inventory-ledger-and-balances.md).
+Cada Store gestiona stock por `GlobalProduct` ofrecido (`StoreProduct`). El estado actual vive en `InventoryItem` (`OnHand`, `Reserved`); la historia en `InventoryMovement` inmutable. `Available` se deriva. Las reservas de pedido son filas `InventoryReservation` con ledger `Reservation` / `ReservationReleased` / `ReservationCommitted`. Mutaciones manuales (Initialize / Adjust / Waste) exigen `Idempotency-Key` y no pueden gastar por encima de `Available`. Detalle: [ADR-007](adr/ADR-007-inventory-ledger-and-balances.md).
 
 ## Procurement
 
@@ -133,6 +134,12 @@ El consumidor pregunta cobertura y catálogo con lat/lon en el body (nunca en la
 `IConsumerStoreResolver` elige como máximo una dark store elegible (`Tenant` Active, `Store` Active, área enabled, `ST_DWithin`) ordenando por distancia y `StoreId`. Cobertura, catálogo, categorías y detalle de producto re-resuelven siempre desde las coordenadas; no hay `FulfillmentContextId`.
 
 Los DTOs de consumidor no incluyen store/tenant ids, stock, distancia ni coordenadas. Sin cobertura o producto no visible → 404 en detalle (indistinguible). Lecturas anónimas no auditan ni persisten la ubicación del consumidor. Suscripción SaaS más allá de `Tenant.Status` = Decision Pending (no se inventa billing). Detalle: [ADR-009](adr/ADR-009-consumer-discovery-geolocation-and-catalog.md).
+
+## Orders
+
+El consumidor autenticado (`RoleNames.Consumer`, JWT sin `TenantId`) arma un carrito contra la store que `IConsumerStoreResolver` elige por lat/lon. El puerto vive en `Chevrere.SharedKernel.Discovery` para que Orders y Consumer compartan la misma decisión; `GeoCoordinate` sigue en Consumer.Domain. Crear el pedido convierte el carrito, congela precio y ficha, y reserva `Available` vía `IInventoryReservationService`. `Confirm` no mueve `OnHand`. TTL 15 minutos; el worker de expiración se apaga en Testing.
+
+DTOs `/api/v1/consumer/cart|orders` no incluyen store, tenant, coords, reservas ni inventario. Business lista por store propia (404 si es ajena). Admin lee. Detalle: [ADR-010](adr/ADR-010-orders-cart-and-inventory-reservations.md).
 
 ## Catálogo y ciclo de vida
 
@@ -152,6 +159,7 @@ flowchart TD
     Api --> InventoryInfra[Inventory.Infrastructure]
     Api --> ProcInfra[Procurement.Infrastructure]
     Api --> ConsumerInfra[Consumer.Infrastructure]
+    Api --> OrdersInfra[Orders.Infrastructure]
     Api --> SharedInfra[Chevrere.Infrastructure]
 
     IdentityInfra --> IdentityApp[Identity.Application]
@@ -162,6 +170,7 @@ flowchart TD
     InventoryInfra --> InventoryApp[Inventory.Application]
     ProcInfra --> ProcApp[Procurement.Application]
     ConsumerInfra --> ConsumerApp[Consumer.Application]
+    OrdersInfra --> OrdersApp[Orders.Application]
 
     TenancyApp --> IdentityApp
     TenancyApp --> SubsApp
@@ -174,8 +183,10 @@ flowchart TD
     InventoryApp --> InventoryDomain[Inventory.Domain]
     ProcApp --> ProcDomain[Procurement.Domain]
     ConsumerApp --> ConsumerDomain[Consumer.Domain]
+    OrdersApp --> OrdersDomain[Orders.Domain]
 
     ProcApp --> SharedKernel[SharedKernel]
+    OrdersApp --> SharedKernel
     InventoryInfra --> SharedKernel
 
     SharedInfra --> CatalogDomain
@@ -183,12 +194,13 @@ flowchart TD
     SharedInfra --> InventoryDomain
     SharedInfra --> ProcDomain
     SharedInfra --> ConsumerDomain
+    SharedInfra --> OrdersDomain
     SharedInfra --> TenancyDomain
     SharedInfra --> SubsDomain
     SharedInfra --> SharedKernel
 ```
 
-Tenancy.Application orquesta el onboarding. Identity y Subscriptions no conocen Tenancy. Pricing e Inventory no dependen de Catalog Application/Domain. Procurement.Application solo alcanza Inventory por `Chevrere.SharedKernel.Inventory`; tests de arquitectura lo verifican en ambos sentidos. Consumer.Domain y Consumer.Application no referencian Catalog, Pricing, Inventory ni Tenancy; la composición vive en Consumer.Infrastructure.
+Tenancy.Application orquesta el onboarding. Identity y Subscriptions no conocen Tenancy. Pricing e Inventory no dependen de Catalog Application/Domain. Procurement.Application y Orders.Application solo alcanzan Inventory por puertos de `Chevrere.SharedKernel.Inventory`. Orders.Application resuelve la store por `Chevrere.SharedKernel.Discovery`. Consumer.Domain y Consumer.Application no referencian Catalog, Pricing, Inventory, Orders ni Tenancy.
 
 ## Multi-tenancy
 
@@ -204,9 +216,9 @@ User autenticado
   → Query filters de EF Core
 ```
 
-Filtros globales en `Tenant`, `Franchisee`, `Store`, `Subscription`, `AuditEvent`, `StoreProduct`, `InventoryItem`, `InventoryMovement`, `Supplier`, `PurchaseOrder`, `GoodsReceipt` y `StoreServiceArea`. `Category` y `GlobalProduct` no se filtran por tenant. Los usuarios de plataforma (`PlatformSuperAdmin`, `PlatformAdmin`, `PlatformSupport`) omiten los filtros. Los endpoints `/api/v1/business/*` no aceptan `tenantId` del request. Una Store ajena responde 404.
+Filtros globales en `Tenant`, `Franchisee`, `Store`, `Subscription`, `AuditEvent`, `StoreProduct`, `InventoryItem`, `InventoryMovement`, `InventoryReservation`, `Supplier`, `PurchaseOrder`, `GoodsReceipt`, `StoreServiceArea`, `Cart` y `Order`. `Category` y `GlobalProduct` no se filtran por tenant. Los usuarios de plataforma omiten los filtros. El consumidor no tiene tenant: cart/orders se leen con `IgnoreQueryFilters` + `ConsumerUserId`. Los endpoints `/api/v1/business/*` no aceptan `tenantId` del request. Una Store ajena responde 404.
 
-`User.TenantId` nulo identifica personal de plataforma. Un Owner siempre nace ligado al tenant creado. Las lecturas anónimas de Consumer Discovery no tienen tenant: el resolver usa SQL con filtros explícitos (`IgnoreQueryFilters` solo ahí).
+`User.TenantId` nulo identifica personal de plataforma **o** un consumidor. Un Owner siempre nace ligado al tenant creado. Las lecturas anónimas de Consumer Discovery no tienen tenant: el resolver usa SQL con filtros explícitos (`IgnoreQueryFilters` solo ahí).
 
 ## Tenant vs Franchisee vs Store
 
@@ -251,6 +263,7 @@ Policies:
 | PlatformOperators | SuperAdmin, Admin (mutaciones) |
 | PlatformSuperAdmin | SuperAdmin |
 | FranchiseeOwner | Owner del asociado |
+| Consumer | Comprador de la app (sin tenant) |
 
 Crear, activar, suspender y reactivar asociados, y mutar el catálogo global, exige `PlatformOperators`. `PlatformSupport` puede leer el catálogo, no escribirlo. El Owner habilita/deshabilita productos solo en stores de su tenant.
 
@@ -258,7 +271,7 @@ Crear, activar, suspender y reactivar asociados, y mutar el catálogo global, ex
 
 Cada request recibe o genera un `X-Correlation-ID`. Se propaga a logs y a `audit_events`.
 
-Se registran creación de tenant, franchisee, store, owner, subscription, activación, suspensión, reactivación y cambio de plan; mutaciones de Catalog; cambios de Pricing; Inventory (`InventoryInitialized`, `InventoryAdjusted`, `InventoryWasteRecorded`); Procurement (ciclo de vida de `Supplier` y `PurchaseOrder`, más `GoodsReceiptRecorded`); y Consumer Discovery (`StoreServiceAreaConfigured` / `Enabled` / `Disabled`). Los snapshots JSONB no incluyen contraseñas. Las lecturas anónimas de cobertura/catálogo no generan auditoría ni persisten la ubicación del consumidor.
+Se registran creación de tenant, franchisee, store, owner, subscription, activación, suspensión, reactivación y cambio de plan; mutaciones de Catalog; cambios de Pricing; Inventory (`InventoryInitialized`, `InventoryAdjusted`, `InventoryWasteRecorded`); Procurement (ciclo de vida de `Supplier` y `PurchaseOrder`, más `GoodsReceiptRecorded`); Consumer Discovery (`StoreServiceAreaConfigured` / `Enabled` / `Disabled`); y Orders (`OrderCreated`, `OrderCancelled`, `OrderExpired`). Los snapshots JSONB no incluyen contraseñas. Las lecturas anónimas de cobertura/catálogo y las mutaciones de carrito no generan auditoría ni persisten la ubicación del consumidor.
 
 `AuditEvent` representa una **mutación empresarial real**, no cada llamada HTTP. Un comando idempotente que pide el estado actual (p. ej. Enable cuando ya está Enabled, Activate cuando ya está Active) responde success sin cambiar `UpdatedAt`, sin `SaveChanges` y sin nuevo evento de auditoría. Serilog puede seguir registrando el request; la auditoría no.
 
@@ -278,7 +291,7 @@ Una sola API, tres superficies:
 
 - `/api/v1/admin/*` — administración Chevrere (incluye configurar/habilitar área de servicio)
 - `/api/v1/business/*` — back-office del asociado (incluye lectura del área de su store)
-- `/api/v1/consumer/*` — discovery anónimo (cobertura, catálogo, categorías, detalle)
+- `/api/v1/consumer/*` — discovery anónimo (cobertura, catálogo, categorías, detalle) y cart/orders autenticados (`Consumer`)
 
 Versionado por URL (`v1`). Sin librería extra.
 

@@ -6,6 +6,7 @@ public static class RoleNames
     public const string PlatformAdmin = "PlatformAdmin";
     public const string PlatformSupport = "PlatformSupport";
     public const string FranchiseeOwner = "FranchiseeOwner";
+    public const string Consumer = "Consumer";
 
     public static readonly IReadOnlyCollection<string> PlatformRoles =
     [
@@ -19,7 +20,8 @@ public static class RoleNames
         PlatformSuperAdmin,
         PlatformAdmin,
         PlatformSupport,
-        FranchiseeOwner
+        FranchiseeOwner,
+        Consumer
     ];
 
     public static bool IsPlatformRole(string role) =>

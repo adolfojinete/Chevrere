@@ -10,6 +10,7 @@ using Chevrere.Modules.Catalog.Infrastructure;
 using Chevrere.Modules.Consumer.Infrastructure;
 using Chevrere.Modules.Identity.Infrastructure;
 using Chevrere.Modules.Inventory.Infrastructure;
+using Chevrere.Modules.Orders.Infrastructure;
 using Chevrere.Modules.Pricing.Infrastructure;
 using Chevrere.Modules.Procurement.Infrastructure;
 using Chevrere.Modules.Subscriptions.Infrastructure;
@@ -51,7 +52,7 @@ try
         {
             Title = "Chevrere API",
             Version = "v1",
-            Description = "Administración central de asociados, catálogo, pricing, inventario y abastecimiento por dark store, más descubrimiento del consumidor por geolocalización."
+            Description = "Administración central de asociados, catálogo, pricing, inventario, abastecimiento, discovery del consumidor y pedidos."
         });
         options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
@@ -64,7 +65,7 @@ try
         });
         options.AddSecurityDefinition("IdempotencyKey", new OpenApiSecurityScheme
         {
-            Description = "Clave de idempotencia para mutaciones de inventario y abastecimiento (8-128 chars).",
+            Description = "Clave de idempotencia para mutaciones de inventario, abastecimiento y creación de pedidos (8-128 chars).",
             Name = "Idempotency-Key",
             In = ParameterLocation.Header,
             Type = SecuritySchemeType.ApiKey
@@ -91,6 +92,7 @@ try
     builder.Services.AddInventoryModule();
     builder.Services.AddProcurementModule();
     builder.Services.AddConsumerModule();
+    builder.Services.AddOrdersModule(builder.Configuration);
 
     var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
         ?? throw new InvalidOperationException("Jwt configuration is missing.");

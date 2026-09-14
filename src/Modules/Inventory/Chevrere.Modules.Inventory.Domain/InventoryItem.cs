@@ -1,4 +1,5 @@
 using Chevrere.SharedKernel.Domain;
+using Chevrere.SharedKernel.Inventory;
 
 namespace Chevrere.Modules.Inventory.Domain;
 
@@ -143,6 +144,7 @@ public sealed class InventoryItem : AggregateRoot
     public InventoryMovement Decrease(long quantity, string reason, Guid? actorUserId, string correlationId, DateTimeOffset utcNow)
     {
         EnsurePositiveQuantity(quantity);
+        EnsureAvailable(quantity);
         return Apply(
             InventoryMovementType.AdjustmentDecrease,
             onHandDelta: checked(-quantity),
@@ -158,6 +160,7 @@ public sealed class InventoryItem : AggregateRoot
     public InventoryMovement RecordWaste(long quantity, string reason, Guid? actorUserId, string correlationId, DateTimeOffset utcNow)
     {
         EnsurePositiveQuantity(quantity);
+        EnsureAvailable(quantity);
         return Apply(
             InventoryMovementType.Waste,
             onHandDelta: checked(-quantity),
@@ -165,6 +168,77 @@ public sealed class InventoryItem : AggregateRoot
             reason: RequireReason(reason),
             referenceType: null,
             referenceId: null,
+            actorUserId,
+            correlationId,
+            utcNow);
+    }
+
+    /// <summary>
+    /// Holds <paramref name="quantity"/> units so they stop being Available. The ledger reference is
+    /// the reservation itself, which lets the unique (type, reference) index reject a double hold.
+    /// </summary>
+    public InventoryMovement Reserve(
+        long quantity,
+        Guid reservationId,
+        Guid? actorUserId,
+        string correlationId,
+        DateTimeOffset utcNow)
+    {
+        EnsurePositiveQuantity(quantity);
+        EnsureReservationId(reservationId);
+        EnsureAvailable(quantity);
+        return Apply(
+            InventoryMovementType.Reservation,
+            onHandDelta: 0,
+            reservedDelta: quantity,
+            reason: null,
+            referenceType: InventoryReferenceTypes.InventoryReservation,
+            referenceId: reservationId,
+            actorUserId,
+            correlationId,
+            utcNow);
+    }
+
+    public InventoryMovement ReleaseReservation(
+        long quantity,
+        Guid reservationId,
+        Guid? actorUserId,
+        string correlationId,
+        DateTimeOffset utcNow)
+    {
+        EnsurePositiveQuantity(quantity);
+        EnsureReservationId(reservationId);
+        return Apply(
+            InventoryMovementType.ReservationReleased,
+            onHandDelta: 0,
+            reservedDelta: checked(-quantity),
+            reason: null,
+            referenceType: InventoryReferenceTypes.InventoryReservation,
+            referenceId: reservationId,
+            actorUserId,
+            correlationId,
+            utcNow);
+    }
+
+    /// <summary>
+    /// Turns a hold into a sale: OnHand and Reserved both drop by <paramref name="quantity"/>.
+    /// </summary>
+    public InventoryMovement CommitReservation(
+        long quantity,
+        Guid reservationId,
+        Guid? actorUserId,
+        string correlationId,
+        DateTimeOffset utcNow)
+    {
+        EnsurePositiveQuantity(quantity);
+        EnsureReservationId(reservationId);
+        return Apply(
+            InventoryMovementType.ReservationCommitted,
+            onHandDelta: checked(-quantity),
+            reservedDelta: checked(-quantity),
+            reason: null,
+            referenceType: InventoryReferenceTypes.InventoryReservation,
+            referenceId: reservationId,
             actorUserId,
             correlationId,
             utcNow);
@@ -209,6 +283,24 @@ public sealed class InventoryItem : AggregateRoot
         if (quantity <= 0)
         {
             throw new DomainException("inventory.quantity.invalid", "Quantity must be greater than zero.");
+        }
+    }
+
+    private void EnsureAvailable(long quantity)
+    {
+        if (quantity > Available)
+        {
+            throw new DomainException(
+                "inventory.insufficient_available",
+                "Available stock is not enough for this quantity.");
+        }
+    }
+
+    private static void EnsureReservationId(Guid reservationId)
+    {
+        if (reservationId == Guid.Empty)
+        {
+            throw new DomainException("inventory.reference.required", "A reservation movement requires a reference.");
         }
     }
 

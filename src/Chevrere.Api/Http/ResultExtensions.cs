@@ -51,6 +51,7 @@ public static class ResultExtensions
             ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
             ErrorType.Forbidden => StatusCodes.Status403Forbidden,
             ErrorType.Concurrency => StatusCodes.Status409Conflict,
+            ErrorType.Failure => StatusCodes.Status500InternalServerError,
             _ => StatusCodes.Status500InternalServerError
         };
 

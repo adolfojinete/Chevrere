@@ -28,6 +28,9 @@ public sealed class InventoryItemConfiguration : IEntityTypeConfiguration<Invent
             .IsUnique()
             .HasDatabaseName("ix_inventory_items_tenant_store_product");
 
+        builder.HasAlternateKey(x => new { x.Id, x.TenantId, x.StoreId, x.GlobalProductId })
+            .HasName("ak_inventory_items_id_tenant_store_product");
+
         builder.HasIndex(x => x.TenantId);
         builder.HasIndex(x => x.StoreId);
 
@@ -91,6 +94,49 @@ public sealed class InventoryMovementConfiguration : IEntityTypeConfiguration<In
             .WithMany()
             .HasForeignKey(x => x.TenantId)
             .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class InventoryReservationConfiguration : IEntityTypeConfiguration<InventoryReservation>
+{
+    public void Configure(EntityTypeBuilder<InventoryReservation> builder)
+    {
+        builder.ToTable("inventory_reservations", table =>
+        {
+            table.HasCheckConstraint("ck_inventory_reservations_quantity_positive", "quantity > 0");
+        });
+
+        builder.HasKey(x => x.Id);
+
+        builder.Property(x => x.ReferenceType).HasMaxLength(64).IsRequired();
+        builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
+        builder.Property(x => x.Quantity).IsRequired();
+
+        builder.HasIndex(x => new { x.ReferenceType, x.ReferenceId })
+            .IsUnique()
+            .HasDatabaseName("ix_inventory_reservations_reference");
+        builder.HasIndex(x => new { x.TenantId, x.StoreId, x.Status })
+            .HasDatabaseName("ix_inventory_reservations_tenant_store_status");
+        builder.HasIndex(x => x.InventoryItemId);
+
+        builder.HasOne<InventoryItem>()
+            .WithMany()
+            .HasForeignKey(x => new { x.InventoryItemId, x.TenantId, x.StoreId, x.GlobalProductId })
+            .HasPrincipalKey(x => new { x.Id, x.TenantId, x.StoreId, x.GlobalProductId })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Tenant>()
+            .WithMany()
+            .HasForeignKey(x => x.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Store>()
+            .WithMany()
+            .HasForeignKey(x => new { x.StoreId, x.TenantId })
+            .HasPrincipalKey(x => new { x.Id, x.TenantId })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.ConfigureXminConcurrency();
     }
 }
 

@@ -3,6 +3,7 @@ using Chevrere.Infrastructure.Identity;
 using Chevrere.Modules.Catalog.Domain;
 using Chevrere.Modules.Consumer.Domain;
 using Chevrere.Modules.Inventory.Domain;
+using Chevrere.Modules.Orders.Domain;
 using Chevrere.Modules.Pricing.Domain;
 using Chevrere.Modules.Procurement.Domain;
 using Chevrere.Modules.Subscriptions.Domain;
@@ -47,6 +48,16 @@ public sealed class ChevrereDbContext(
 
     public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
 
+    public DbSet<InventoryReservation> InventoryReservations => Set<InventoryReservation>();
+
+    public DbSet<Cart> Carts => Set<Cart>();
+
+    public DbSet<CartItem> CartItems => Set<CartItem>();
+
+    public DbSet<Order> Orders => Set<Order>();
+
+    public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+
     public DbSet<Supplier> Suppliers => Set<Supplier>();
 
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
@@ -80,6 +91,11 @@ public sealed class ChevrereDbContext(
         builder.Entity<StoreProductPrice>().HasQueryFilter(s => BypassTenantFilter || s.TenantId == FilterTenantId);
         builder.Entity<InventoryItem>().HasQueryFilter(i => BypassTenantFilter || i.TenantId == FilterTenantId);
         builder.Entity<InventoryMovement>().HasQueryFilter(m => BypassTenantFilter || m.TenantId == FilterTenantId);
+        builder.Entity<InventoryReservation>().HasQueryFilter(r => BypassTenantFilter || r.TenantId == FilterTenantId);
+        builder.Entity<Cart>().HasQueryFilter(c => BypassTenantFilter || c.TenantId == FilterTenantId);
+        builder.Entity<CartItem>().HasQueryFilter(i => BypassTenantFilter || i.TenantId == FilterTenantId);
+        builder.Entity<Order>().HasQueryFilter(o => BypassTenantFilter || o.TenantId == FilterTenantId);
+        builder.Entity<OrderItem>().HasQueryFilter(i => BypassTenantFilter || i.TenantId == FilterTenantId);
         builder.Entity<Supplier>().HasQueryFilter(s => BypassTenantFilter || s.TenantId == FilterTenantId);
         builder.Entity<PurchaseOrder>().HasQueryFilter(o => BypassTenantFilter || o.TenantId == FilterTenantId);
         builder.Entity<PurchaseOrderItem>().HasQueryFilter(i => BypassTenantFilter || i.TenantId == FilterTenantId);
@@ -90,6 +106,7 @@ public sealed class ChevrereDbContext(
         // Document numbers are drawn outside the transaction so retries never reuse a number.
         builder.HasSequence<long>("procurement_purchase_order_number_seq").StartsAt(1).IncrementsBy(1);
         builder.HasSequence<long>("procurement_goods_receipt_number_seq").StartsAt(1).IncrementsBy(1);
+        builder.HasSequence<long>("orders_order_number_seq").StartsAt(1).IncrementsBy(1);
 
         builder.Entity<ApplicationUser>().ToTable("users");
         builder.Entity<ApplicationRole>().ToTable("roles");

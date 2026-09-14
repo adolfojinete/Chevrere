@@ -43,4 +43,7 @@ public static class AuditActions
     public const string StoreServiceAreaConfigured = "store_service_area.configured";
     public const string StoreServiceAreaEnabled = "store_service_area.enabled";
     public const string StoreServiceAreaDisabled = "store_service_area.disabled";
+    public const string OrderCreated = "order.created";
+    public const string OrderCancelled = "order.cancelled";
+    public const string OrderExpired = "order.expired";
 }

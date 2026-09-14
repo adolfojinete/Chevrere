@@ -145,7 +145,7 @@ public sealed class InventoryTests(ChevrereApiFactory factory)
             new AdjustInventoryRequest(InventoryAdjustmentType.Decrease, 50, "Exceso"),
             "adj-key-fail1");
         Assert.Equal(HttpStatusCode.Conflict, insufficient.StatusCode);
-        await AssertProblem(insufficient, "inventory.insufficient_stock");
+        await AssertProblem(insufficient, "inventory.insufficient_available");
         Assert.Equal(40, await GetOnHandAsync(franchisee.StoreId, product.Id));
         Assert.Equal(4, await CountMovementsAsync(franchisee.StoreId, product.Id));
         Assert.Null(await FindIdempotencyAsync(franchisee.TenantId, IdempotencyOperations.InventoryAdjust, "adj-key-fail1"));

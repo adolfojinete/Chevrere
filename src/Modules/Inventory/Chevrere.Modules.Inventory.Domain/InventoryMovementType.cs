@@ -6,5 +6,8 @@ public enum InventoryMovementType
     AdjustmentIncrease = 2,
     AdjustmentDecrease = 3,
     Waste = 4,
-    Receipt = 5
+    Receipt = 5,
+    Reservation = 6,
+    ReservationReleased = 7,
+    ReservationCommitted = 8
 }

@@ -40,5 +40,7 @@ public sealed class IdempotencyKeyOperationFilter : IOperationFilter
     private static bool RequiresIdempotencyKey(string path) =>
         path.Contains("inventory", StringComparison.OrdinalIgnoreCase)
         || path.EndsWith("purchase-orders", StringComparison.OrdinalIgnoreCase)
-        || path.EndsWith("receipts", StringComparison.OrdinalIgnoreCase);
+        || path.EndsWith("receipts", StringComparison.OrdinalIgnoreCase)
+        || (path.EndsWith("consumer/orders", StringComparison.OrdinalIgnoreCase)
+            && !path.Contains("cancel", StringComparison.OrdinalIgnoreCase));
 }

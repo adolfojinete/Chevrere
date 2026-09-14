@@ -24,6 +24,8 @@ namespace Chevrere.Infrastructure.Persistence.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "postgis");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.HasSequence("orders_order_number_seq");
+
             modelBuilder.HasSequence("procurement_goods_receipt_number_seq");
 
             modelBuilder.HasSequence("procurement_purchase_order_number_seq");
@@ -587,6 +589,9 @@ namespace Chevrere.Infrastructure.Persistence.Migrations
                     b.HasAlternateKey("Id", "TenantId")
                         .HasName("ak_inventory_items_id_tenant_id");
 
+                    b.HasAlternateKey("Id", "TenantId", "StoreId", "GlobalProductId")
+                        .HasName("ak_inventory_items_id_tenant_store_product");
+
                     b.HasIndex("GlobalProductId")
                         .HasDatabaseName("ix_inventory_items_global_product_id");
 
@@ -723,6 +728,439 @@ namespace Chevrere.Infrastructure.Persistence.Migrations
                         .HasFilter("reference_id IS NOT NULL");
 
                     b.ToTable("inventory_movements", (string)null);
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Inventory.Domain.InventoryReservation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("CommittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("committed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("GlobalProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("global_product_id");
+
+                    b.Property<Guid>("InventoryItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("inventory_item_id");
+
+                    b.Property<long>("Quantity")
+                        .HasColumnType("bigint")
+                        .HasColumnName("quantity");
+
+                    b.Property<Guid>("ReferenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reference_id");
+
+                    b.Property<string>("ReferenceType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reference_type");
+
+                    b.Property<DateTimeOffset?>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("released_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("store_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_inventory_reservations");
+
+                    b.HasIndex("InventoryItemId")
+                        .HasDatabaseName("ix_inventory_reservations_inventory_item_id");
+
+                    b.HasIndex("ReferenceType", "ReferenceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_inventory_reservations_reference");
+
+                    b.HasIndex("StoreId", "TenantId")
+                        .HasDatabaseName("ix_inventory_reservations_store_id_tenant_id");
+
+                    b.HasIndex("TenantId", "StoreId", "Status")
+                        .HasDatabaseName("ix_inventory_reservations_tenant_store_status");
+
+                    b.HasIndex("InventoryItemId", "TenantId", "StoreId", "GlobalProductId")
+                        .HasDatabaseName("ix_inventory_reservations_inventory_item_id_tenant_id_store_id");
+
+                    b.ToTable("inventory_reservations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_inventory_reservations_quantity_positive", "quantity > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Orders.Domain.Cart", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConsumerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("consumer_user_id");
+
+                    b.Property<DateTimeOffset?>("ConvertedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("converted_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("store_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_carts");
+
+                    b.HasAlternateKey("Id", "ConsumerUserId", "TenantId", "StoreId")
+                        .HasName("ak_carts_id_consumer_tenant_store");
+
+                    b.HasIndex("ConsumerUserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_carts_consumer_active")
+                        .HasFilter("status = 'Active'");
+
+                    b.HasIndex("StoreId", "TenantId")
+                        .HasDatabaseName("ix_carts_store_id_tenant_id");
+
+                    b.HasIndex("TenantId", "StoreId")
+                        .HasDatabaseName("ix_carts_tenant_id_store_id");
+
+                    b.ToTable("carts", (string)null);
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Orders.Domain.CartItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CartId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cart_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("GlobalProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("global_product_id");
+
+                    b.Property<long>("Quantity")
+                        .HasColumnType("bigint")
+                        .HasColumnName("quantity");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("store_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cart_items");
+
+                    b.HasIndex("GlobalProductId")
+                        .HasDatabaseName("ix_cart_items_global_product_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_cart_items_tenant_id");
+
+                    b.HasIndex("CartId", "GlobalProductId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_cart_items_cart_product");
+
+                    b.HasIndex("TenantId", "StoreId", "GlobalProductId")
+                        .HasDatabaseName("ix_cart_items_tenant_id_store_id_global_product_id");
+
+                    b.ToTable("cart_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_cart_items_quantity_positive", "quantity > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Orders.Domain.Order", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("cancel_reason");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancelled_at");
+
+                    b.Property<Guid>("ConsumerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("consumer_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("number");
+
+                    b.Property<Guid>("SourceCartId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_cart_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("store_id");
+
+                    b.Property<decimal>("SubtotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("subtotal_amount");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total_amount");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_orders");
+
+                    b.HasAlternateKey("Id", "TenantId")
+                        .HasName("ak_orders_id_tenant_id");
+
+                    b.HasIndex("SourceCartId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_orders_source_cart_id");
+
+                    b.HasIndex("ConsumerUserId", "CreatedAt")
+                        .HasDatabaseName("ix_orders_consumer_created_at");
+
+                    b.HasIndex("Status", "ExpiresAt")
+                        .HasDatabaseName("ix_orders_status_expires_at");
+
+                    b.HasIndex("StoreId", "TenantId")
+                        .HasDatabaseName("ix_orders_store_id_tenant_id");
+
+                    b.HasIndex("TenantId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_orders_tenant_number");
+
+                    b.HasIndex("TenantId", "StoreId", "CreatedAt")
+                        .HasDatabaseName("ix_orders_tenant_store_created_at");
+
+                    b.HasIndex("SourceCartId", "ConsumerUserId", "TenantId", "StoreId")
+                        .HasDatabaseName("ix_orders_source_cart_id_consumer_user_id_tenant_id_store_id");
+
+                    b.ToTable("orders", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_orders_subtotal_positive", "subtotal_amount > 0");
+
+                            t.HasCheckConstraint("ck_orders_total_positive", "total_amount > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Orders.Domain.OrderItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Brand")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("brand");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("GlobalProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("global_product_id");
+
+                    b.Property<decimal>("LineTotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("line_total_amount");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Presentation")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("presentation");
+
+                    b.Property<long>("Quantity")
+                        .HasColumnType("bigint")
+                        .HasColumnName("quantity");
+
+                    b.Property<string>("Sku")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sku");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("store_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("UnitPriceAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("unit_price_amount");
+
+                    b.Property<string>("UnitPriceCurrency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("unit_price_currency");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_items");
+
+                    b.HasIndex("GlobalProductId")
+                        .HasDatabaseName("ix_order_items_global_product_id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_order_items_tenant_id");
+
+                    b.HasIndex("OrderId", "GlobalProductId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_order_items_order_product");
+
+                    b.HasIndex("OrderId", "TenantId")
+                        .HasDatabaseName("ix_order_items_order_id_tenant_id");
+
+                    b.HasIndex("TenantId", "StoreId", "GlobalProductId")
+                        .HasDatabaseName("ix_order_items_tenant_id_store_id_global_product_id");
+
+                    b.ToTable("order_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_items_line_total_positive", "line_total_amount > 0");
+
+                            t.HasCheckConstraint("ck_order_items_quantity_positive", "quantity > 0");
+
+                            t.HasCheckConstraint("ck_order_items_unit_price_positive", "unit_price_amount > 0");
+                        });
                 });
 
             modelBuilder.Entity("Chevrere.Modules.Pricing.Domain.GlobalProductPrice", b =>
@@ -1969,6 +2407,155 @@ namespace Chevrere.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_inventory_movements_inventory_items_inventory_item_id_tenan");
                 });
 
+            modelBuilder.Entity("Chevrere.Modules.Inventory.Domain.InventoryReservation", b =>
+                {
+                    b.HasOne("Chevrere.Modules.Tenancy.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_inventory_reservations_tenants_tenant_id");
+
+                    b.HasOne("Chevrere.Modules.Tenancy.Domain.Store", null)
+                        .WithMany()
+                        .HasForeignKey("StoreId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_inventory_reservations_stores_store_id_tenant_id");
+
+                    b.HasOne("Chevrere.Modules.Inventory.Domain.InventoryItem", null)
+                        .WithMany()
+                        .HasForeignKey("InventoryItemId", "TenantId", "StoreId", "GlobalProductId")
+                        .HasPrincipalKey("Id", "TenantId", "StoreId", "GlobalProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_inventory_reservations_inventory_items_inventory_item_id_te");
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Orders.Domain.Cart", b =>
+                {
+                    b.HasOne("Chevrere.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ConsumerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_carts_asp_net_users_consumer_user_id");
+
+                    b.HasOne("Chevrere.Modules.Tenancy.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_carts_tenants_tenant_id");
+
+                    b.HasOne("Chevrere.Modules.Tenancy.Domain.Store", null)
+                        .WithMany()
+                        .HasForeignKey("StoreId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_carts_stores_store_id_tenant_id");
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Orders.Domain.CartItem", b =>
+                {
+                    b.HasOne("Chevrere.Modules.Orders.Domain.Cart", null)
+                        .WithMany("Items")
+                        .HasForeignKey("CartId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_cart_items_carts_cart_id");
+
+                    b.HasOne("Chevrere.Modules.Catalog.Domain.GlobalProduct", null)
+                        .WithMany()
+                        .HasForeignKey("GlobalProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cart_items_global_products_global_product_id");
+
+                    b.HasOne("Chevrere.Modules.Tenancy.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cart_items_tenants_tenant_id");
+
+                    b.HasOne("Chevrere.Modules.Catalog.Domain.StoreProduct", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "StoreId", "GlobalProductId")
+                        .HasPrincipalKey("TenantId", "StoreId", "GlobalProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cart_items_store_products_tenant_id_store_id_global_product");
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Orders.Domain.Order", b =>
+                {
+                    b.HasOne("Chevrere.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ConsumerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_orders_asp_net_users_consumer_user_id");
+
+                    b.HasOne("Chevrere.Modules.Tenancy.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_orders_tenants_tenant_id");
+
+                    b.HasOne("Chevrere.Modules.Tenancy.Domain.Store", null)
+                        .WithMany()
+                        .HasForeignKey("StoreId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_orders_stores_store_id_tenant_id");
+
+                    b.HasOne("Chevrere.Modules.Orders.Domain.Cart", null)
+                        .WithMany()
+                        .HasForeignKey("SourceCartId", "ConsumerUserId", "TenantId", "StoreId")
+                        .HasPrincipalKey("Id", "ConsumerUserId", "TenantId", "StoreId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_orders_carts_source_cart_id_consumer_user_id_tenant_id_stor");
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Orders.Domain.OrderItem", b =>
+                {
+                    b.HasOne("Chevrere.Modules.Catalog.Domain.GlobalProduct", null)
+                        .WithMany()
+                        .HasForeignKey("GlobalProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_items_global_products_global_product_id");
+
+                    b.HasOne("Chevrere.Modules.Tenancy.Domain.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_items_tenants_tenant_id");
+
+                    b.HasOne("Chevrere.Modules.Orders.Domain.Order", null)
+                        .WithMany("Items")
+                        .HasForeignKey("OrderId", "TenantId")
+                        .HasPrincipalKey("Id", "TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_items_orders_order_id_tenant_id");
+
+                    b.HasOne("Chevrere.Modules.Catalog.Domain.StoreProduct", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "StoreId", "GlobalProductId")
+                        .HasPrincipalKey("TenantId", "StoreId", "GlobalProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_items_store_products_tenant_id_store_id_global_produc");
+                });
+
             modelBuilder.Entity("Chevrere.Modules.Pricing.Domain.GlobalProductPrice", b =>
                 {
                     b.HasOne("Chevrere.Modules.Catalog.Domain.GlobalProduct", null)
@@ -2248,6 +2835,16 @@ namespace Chevrere.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_user_tokens_users_user_id");
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Orders.Domain.Cart", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Chevrere.Modules.Orders.Domain.Order", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Chevrere.Modules.Procurement.Domain.GoodsReceipt", b =>

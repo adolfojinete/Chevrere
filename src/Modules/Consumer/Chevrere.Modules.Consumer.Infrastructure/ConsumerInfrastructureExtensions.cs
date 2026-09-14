@@ -1,6 +1,7 @@
 using Chevrere.Modules.Consumer.Application;
 using Chevrere.Modules.Consumer.Application.Abstractions;
 using Chevrere.Modules.Consumer.Infrastructure.Persistence;
+using Chevrere.SharedKernel.Discovery;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Chevrere.Modules.Consumer.Infrastructure;

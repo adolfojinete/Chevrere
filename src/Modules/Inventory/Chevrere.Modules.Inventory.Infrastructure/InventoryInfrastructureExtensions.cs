@@ -14,6 +14,7 @@ public static class InventoryInfrastructureExtensions
         services.AddScoped<IInventoryStore, InventoryStore>();
         services.AddScoped<IInventoryStoreAccess, InventoryStoreAccess>();
         services.AddScoped<IInventoryInboundService, InventoryInboundService>();
+        services.AddScoped<IInventoryReservationService, InventoryReservationService>();
         return services;
     }
 }

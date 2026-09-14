@@ -15,4 +15,6 @@ public sealed record Error(string Code, string Message, ErrorType Type)
     public static Error Forbidden(string code, string message) => new(code, message, ErrorType.Forbidden);
 
     public static Error Concurrency(string code, string message) => new(code, message, ErrorType.Concurrency);
+
+    public static Error Failure(string code, string message) => new(code, message, ErrorType.Failure);
 }
