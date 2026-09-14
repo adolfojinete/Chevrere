@@ -42,6 +42,7 @@ public sealed class ModuleDependencyTests
             typeof(GlobalProductPrice).Assembly,
             typeof(InventoryItem).Assembly,
             typeof(PurchaseOrder).Assembly,
+            typeof(Chevrere.Modules.Orders.Domain.Order).Assembly,
             typeof(StoreServiceArea).Assembly,
             typeof(Entity).Assembly
         };
@@ -68,7 +69,9 @@ public sealed class ModuleDependencyTests
                     "Chevrere.Modules.Procurement.Application",
                     "Chevrere.Modules.Procurement.Infrastructure",
                     "Chevrere.Modules.Consumer.Application",
-                    "Chevrere.Modules.Consumer.Infrastructure")
+                    "Chevrere.Modules.Consumer.Infrastructure",
+                    "Chevrere.Modules.Orders.Application",
+                    "Chevrere.Modules.Orders.Infrastructure")
                 .GetResult();
 
             Assert.True(result.IsSuccessful, Format(result));
@@ -87,7 +90,8 @@ public sealed class ModuleDependencyTests
             typeof(PricingApplicationExtensions).Assembly,
             typeof(InventoryApplicationExtensions).Assembly,
             typeof(ProcurementApplicationExtensions).Assembly,
-            typeof(ConsumerApplicationExtensions).Assembly
+            typeof(ConsumerApplicationExtensions).Assembly,
+            typeof(Chevrere.Modules.Orders.Application.OrdersApplicationExtensions).Assembly
         };
 
         foreach (var assembly in assemblies)
@@ -104,7 +108,8 @@ public sealed class ModuleDependencyTests
                     "Chevrere.Modules.Pricing.Infrastructure",
                     "Chevrere.Modules.Inventory.Infrastructure",
                     "Chevrere.Modules.Procurement.Infrastructure",
-                    "Chevrere.Modules.Consumer.Infrastructure")
+                    "Chevrere.Modules.Consumer.Infrastructure",
+                    "Chevrere.Modules.Orders.Infrastructure")
                 .GetResult();
 
             Assert.True(result.IsSuccessful, Format(result));
@@ -301,7 +306,10 @@ public sealed class ModuleDependencyTests
                 .HaveDependencyOnAny(
                     "Chevrere.Modules.Procurement.Application",
                     "Chevrere.Modules.Procurement.Domain",
-                    "Chevrere.Modules.Procurement.Infrastructure")
+                    "Chevrere.Modules.Procurement.Infrastructure",
+                    "Chevrere.Modules.Orders.Application",
+                    "Chevrere.Modules.Orders.Domain",
+                    "Chevrere.Modules.Orders.Infrastructure")
                 .GetResult();
 
             Assert.True(result.IsSuccessful, Format(result));
@@ -343,7 +351,10 @@ public sealed class ModuleDependencyTests
                     "Chevrere.Modules.Procurement.Infrastructure",
                     "Chevrere.Modules.Tenancy.Application",
                     "Chevrere.Modules.Tenancy.Domain",
-                    "Chevrere.Modules.Tenancy.Infrastructure")
+                    "Chevrere.Modules.Tenancy.Infrastructure",
+                    "Chevrere.Modules.Orders.Application",
+                    "Chevrere.Modules.Orders.Domain",
+                    "Chevrere.Modules.Orders.Infrastructure")
                 .GetResult();
 
             Assert.True(result.IsSuccessful, Format(result));
@@ -379,7 +390,8 @@ public sealed class ModuleDependencyTests
             typeof(PricingInfrastructureExtensions).Assembly,
             typeof(InventoryInfrastructureExtensions).Assembly,
             typeof(ProcurementInfrastructureExtensions).Assembly,
-            typeof(ConsumerInfrastructureExtensions).Assembly
+            typeof(ConsumerInfrastructureExtensions).Assembly,
+            typeof(Chevrere.Modules.Orders.Infrastructure.OrdersInfrastructureExtensions).Assembly
         };
 
         foreach (var assembly in assemblies)
@@ -391,6 +403,85 @@ public sealed class ModuleDependencyTests
 
             Assert.True(result.IsSuccessful, Format(result));
         }
+    }
+
+    [Fact]
+    public void Orders_domain_does_not_depend_on_other_modules()
+    {
+        var result = Types.InAssembly(typeof(Chevrere.Modules.Orders.Domain.Order).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "Chevrere.Api",
+                "Chevrere.Infrastructure",
+                "Chevrere.Modules.Catalog.Application",
+                "Chevrere.Modules.Catalog.Domain",
+                "Chevrere.Modules.Catalog.Infrastructure",
+                "Chevrere.Modules.Pricing.Application",
+                "Chevrere.Modules.Pricing.Domain",
+                "Chevrere.Modules.Pricing.Infrastructure",
+                "Chevrere.Modules.Inventory.Application",
+                "Chevrere.Modules.Inventory.Domain",
+                "Chevrere.Modules.Inventory.Infrastructure",
+                "Chevrere.Modules.Consumer.Application",
+                "Chevrere.Modules.Consumer.Domain",
+                "Chevrere.Modules.Consumer.Infrastructure",
+                "Chevrere.Modules.Procurement.Application",
+                "Chevrere.Modules.Procurement.Domain",
+                "Chevrere.Modules.Procurement.Infrastructure",
+                "Chevrere.Modules.Tenancy.Application",
+                "Chevrere.Modules.Tenancy.Domain",
+                "Chevrere.Modules.Tenancy.Infrastructure")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, Format(result));
+    }
+
+    /// <summary>
+    /// Orders reserves stock through the SharedKernel reservation contract and resolves stores
+    /// through SharedKernel.Discovery. It must not take a project reference to Inventory or Consumer.
+    /// </summary>
+    [Fact]
+    public void Orders_application_reaches_inventory_only_through_shared_kernel()
+    {
+        var result = Types.InAssembly(typeof(Chevrere.Modules.Orders.Application.OrdersApplicationExtensions).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "Chevrere.Api",
+                "Chevrere.Infrastructure",
+                "Chevrere.Modules.Catalog.Application",
+                "Chevrere.Modules.Catalog.Domain",
+                "Chevrere.Modules.Catalog.Infrastructure",
+                "Chevrere.Modules.Pricing.Application",
+                "Chevrere.Modules.Pricing.Domain",
+                "Chevrere.Modules.Pricing.Infrastructure",
+                "Chevrere.Modules.Inventory.Application",
+                "Chevrere.Modules.Inventory.Domain",
+                "Chevrere.Modules.Inventory.Infrastructure",
+                "Chevrere.Modules.Consumer.Application",
+                "Chevrere.Modules.Consumer.Domain",
+                "Chevrere.Modules.Consumer.Infrastructure",
+                "Chevrere.Modules.Tenancy.Application",
+                "Chevrere.Modules.Tenancy.Domain",
+                "Chevrere.Modules.Tenancy.Infrastructure")
+            .GetResult();
+
+        var usesReservation = Types.InAssembly(typeof(Chevrere.Modules.Orders.Application.OrdersApplicationExtensions).Assembly)
+            .That()
+            .HaveNameEndingWith("CreateOrderHandler")
+            .Should()
+            .HaveDependencyOn("Chevrere.SharedKernel.Inventory")
+            .GetResult();
+
+        var usesDiscovery = Types.InAssembly(typeof(Chevrere.Modules.Orders.Application.OrdersApplicationExtensions).Assembly)
+            .That()
+            .HaveNameEndingWith("CreateOrderHandler")
+            .Should()
+            .HaveDependencyOn("Chevrere.SharedKernel.Discovery")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, Format(result));
+        Assert.True(usesReservation.IsSuccessful, Format(usesReservation));
+        Assert.True(usesDiscovery.IsSuccessful, Format(usesDiscovery));
     }
 
     private static string Format(TestResult result) =>

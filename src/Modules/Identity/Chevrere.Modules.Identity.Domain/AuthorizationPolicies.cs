@@ -6,4 +6,5 @@ public static class AuthorizationPolicies
     public const string PlatformOperators = "PlatformOperators";
     public const string PlatformSuperAdmin = "PlatformSuperAdmin";
     public const string FranchiseeOwner = "FranchiseeOwner";
+    public const string Consumer = "Consumer";
 }

@@ -17,13 +17,32 @@ public interface IInventoryStore
 {
     Task<InventoryItem?> GetItemAsync(Guid storeId, Guid globalProductId, CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<InventoryItem>> GetItemsByProductsAsync(
+        Guid tenantId,
+        Guid storeId,
+        IReadOnlyList<Guid> globalProductIds,
+        CancellationToken cancellationToken);
+
+    Task<InventoryReservation?> GetReservationAsync(Guid reservationId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<InventoryReservation>> GetReservationsByReferencesAsync(
+        Guid tenantId,
+        Guid storeId,
+        string referenceType,
+        IReadOnlyList<Guid> referenceIds,
+        CancellationToken cancellationToken);
+
     void AddItem(InventoryItem item);
 
     void AddMovement(InventoryMovement movement);
 
+    void AddReservation(InventoryReservation reservation);
+
     void DiscardItem(InventoryItem item);
 
     void DiscardMovement(InventoryMovement movement);
+
+    void DiscardReservation(InventoryReservation reservation);
 
     Task<InventoryMovement?> GetMovementAsync(Guid movementId, CancellationToken cancellationToken);
 

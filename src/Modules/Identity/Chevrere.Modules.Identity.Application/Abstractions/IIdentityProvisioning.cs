@@ -7,5 +7,11 @@ public interface IIdentityProvisioning
 {
     Task<Result<OwnerUserResult>> AddOwnerAsync(OwnerUserRequest request, CancellationToken cancellationToken);
 
+    Task<Result<ConsumerUserResult>> AddConsumerAsync(
+        string email,
+        string password,
+        string displayName,
+        CancellationToken cancellationToken);
+
     Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken);
 }

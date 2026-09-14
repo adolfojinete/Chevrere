@@ -6,6 +6,10 @@ namespace Chevrere.SharedKernel.Inventory;
 public static class InventoryReferenceTypes
 {
     public const string GoodsReceiptItem = "GoodsReceiptItem";
+
+    public const string InventoryReservation = "InventoryReservation";
+
+    public const string OrderItem = "OrderItem";
 }
 
 /// <summary>

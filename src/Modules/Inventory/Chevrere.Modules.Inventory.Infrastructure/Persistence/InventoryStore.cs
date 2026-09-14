@@ -30,9 +30,56 @@ public sealed class InventoryStore(ChevrereDbContext dbContext) : IInventoryStor
             i => i.StoreId == storeId && i.GlobalProductId == globalProductId,
             cancellationToken);
 
+    public async Task<IReadOnlyList<InventoryItem>> GetItemsByProductsAsync(
+        Guid tenantId,
+        Guid storeId,
+        IReadOnlyList<Guid> globalProductIds,
+        CancellationToken cancellationToken)
+    {
+        if (globalProductIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await dbContext.InventoryItems
+            .IgnoreQueryFilters()
+            .Where(i => i.TenantId == tenantId
+                        && i.StoreId == storeId
+                        && globalProductIds.Contains(i.GlobalProductId))
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<InventoryReservation?> GetReservationAsync(Guid reservationId, CancellationToken cancellationToken) =>
+        dbContext.InventoryReservations
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(r => r.Id == reservationId, cancellationToken);
+
+    public async Task<IReadOnlyList<InventoryReservation>> GetReservationsByReferencesAsync(
+        Guid tenantId,
+        Guid storeId,
+        string referenceType,
+        IReadOnlyList<Guid> referenceIds,
+        CancellationToken cancellationToken)
+    {
+        if (referenceIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await dbContext.InventoryReservations
+            .IgnoreQueryFilters()
+            .Where(r => r.TenantId == tenantId
+                        && r.StoreId == storeId
+                        && r.ReferenceType == referenceType
+                        && referenceIds.Contains(r.ReferenceId))
+            .ToListAsync(cancellationToken);
+    }
+
     public void AddItem(InventoryItem item) => dbContext.InventoryItems.Add(item);
 
     public void AddMovement(InventoryMovement movement) => dbContext.InventoryMovements.Add(movement);
+
+    public void AddReservation(InventoryReservation reservation) => dbContext.InventoryReservations.Add(reservation);
 
     public void DiscardItem(InventoryItem item)
     {
@@ -46,6 +93,15 @@ public sealed class InventoryStore(ChevrereDbContext dbContext) : IInventoryStor
     public void DiscardMovement(InventoryMovement movement)
     {
         var entry = dbContext.Entry(movement);
+        if (entry.State != EntityState.Detached)
+        {
+            entry.State = EntityState.Detached;
+        }
+    }
+
+    public void DiscardReservation(InventoryReservation reservation)
+    {
+        var entry = dbContext.Entry(reservation);
         if (entry.State != EntityState.Detached)
         {
             entry.State = EntityState.Detached;

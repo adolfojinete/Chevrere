@@ -2,6 +2,7 @@ using Chevrere.Modules.Consumer.Application.Abstractions;
 using Chevrere.Modules.Consumer.Application.Contracts;
 using Chevrere.Modules.Consumer.Domain.ValueObjects;
 using Chevrere.SharedKernel.Application;
+using Chevrere.SharedKernel.Discovery;
 using Chevrere.SharedKernel.Domain;
 using Chevrere.SharedKernel.Results;
 
@@ -22,7 +23,8 @@ public sealed class CheckCoverageHandler(IConsumerStoreResolver resolver)
             return Result.Failure<CoverageDto>(error);
         }
 
-        var store = await resolver.ResolveEligibleStoreAsync(location, cancellationToken);
+        var store = await resolver.ResolveEligibleStoreAsync(
+            location.Latitude, location.Longitude, cancellationToken);
         return Result.Success(new CoverageDto(store is not null));
     }
 }
@@ -51,7 +53,8 @@ public sealed class SearchConsumerCatalogHandler(
             return Result.Failure<ConsumerCatalogResponse>(error);
         }
 
-        var store = await resolver.ResolveEligibleStoreAsync(location, cancellationToken);
+        var store = await resolver.ResolveEligibleStoreAsync(
+            location.Latitude, location.Longitude, cancellationToken);
         if (store is null)
         {
             return Result.Success(new ConsumerCatalogResponse(false, page, pageSize, 0, []));
@@ -86,7 +89,8 @@ public sealed class SearchConsumerCategoriesHandler(
             return Result.Failure<ConsumerCategoriesResponse>(error);
         }
 
-        var store = await resolver.ResolveEligibleStoreAsync(location, cancellationToken);
+        var store = await resolver.ResolveEligibleStoreAsync(
+            location.Latitude, location.Longitude, cancellationToken);
         if (store is null)
         {
             return Result.Success(new ConsumerCategoriesResponse(false, []));
@@ -118,7 +122,8 @@ public sealed class GetConsumerProductDetailHandler(
             return Result.Failure<ConsumerProductDetailDto>(error);
         }
 
-        var store = await resolver.ResolveEligibleStoreAsync(location, cancellationToken);
+        var store = await resolver.ResolveEligibleStoreAsync(
+            location.Latitude, location.Longitude, cancellationToken);
         if (store is null)
         {
             return Result.Failure<ConsumerProductDetailDto>(NotFound());

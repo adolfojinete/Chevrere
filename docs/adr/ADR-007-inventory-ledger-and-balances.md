@@ -64,9 +64,9 @@ Así, `same key` ⇒ **mismo resultado semántico**, no el estado posterior de l
 
 ### Alcance explícitamente fuera
 
-Orders/reservas API, Receipt/Procurement, transfers, lots, FIFO, costos, Redis, RabbitMQ, soft-delete de inventory. Retención/cleanup de `idempotent_operations` queda pendiente.
+Transfers, lots, FIFO, costos, Redis, RabbitMQ, soft-delete de inventory. Retención/cleanup de `idempotent_operations` queda pendiente. El commit de stock al confirmar un pedido (pago) queda para una fase posterior: `Order.Confirm` no llama `CommitReservation`.
 
-Reservas futuras: `Reserved` queda preparado en el modelo; endpoints Reserve/Release/Commit no se exponen aún.
+Reservas: `Reserved` está respaldado por `InventoryReservation` y movements `Reservation` / `ReservationReleased` / `ReservationCommitted` (Fase 7, [ADR-010](ADR-010-orders-cart-and-inventory-reservations.md)). Decrease/Waste rechazan cantidades por encima de `Available`.
 
 ## Consecuencias
 

@@ -1,7 +1,6 @@
 using Chevrere.Infrastructure.Persistence;
-using Chevrere.Modules.Consumer.Application.Abstractions;
-using Chevrere.Modules.Consumer.Domain.ValueObjects;
 using Chevrere.Modules.Tenancy.Domain;
+using Chevrere.SharedKernel.Discovery;
 using Microsoft.EntityFrameworkCore;
 
 namespace Chevrere.Modules.Consumer.Infrastructure.Persistence;
@@ -25,13 +24,10 @@ namespace Chevrere.Modules.Consumer.Infrastructure.Persistence;
 public sealed class ConsumerStoreResolver(ChevrereDbContext dbContext) : IConsumerStoreResolver
 {
     public async Task<ConsumerFulfillmentStore?> ResolveEligibleStoreAsync(
-        GeoCoordinate location,
+        double latitude,
+        double longitude,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(location);
-
-        var longitude = location.Longitude;
-        var latitude = location.Latitude;
         var activeStore = nameof(StoreStatus.Active);
         var activeTenant = nameof(TenantStatus.Active);
 

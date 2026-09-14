@@ -2,6 +2,7 @@ using Chevrere.Infrastructure.Persistence;
 using Chevrere.Modules.Catalog.Domain;
 using Chevrere.Modules.Consumer.Application.Abstractions;
 using Chevrere.Modules.Consumer.Application.Contracts;
+using Chevrere.SharedKernel.Discovery;
 using Microsoft.EntityFrameworkCore;
 
 namespace Chevrere.Modules.Consumer.Infrastructure.Persistence;

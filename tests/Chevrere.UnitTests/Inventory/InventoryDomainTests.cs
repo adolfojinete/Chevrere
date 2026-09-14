@@ -79,8 +79,67 @@ public sealed class InventoryDomainTests
         var ex = Assert.Throws<DomainException>(() =>
             item.Decrease(6, "Conteo", ActorId, "corr", FixedClock.Now));
 
-        Assert.Equal("inventory.insufficient_stock", ex.Code);
+        Assert.Equal("inventory.insufficient_available", ex.Code);
         Assert.Equal(5, item.OnHand);
+    }
+
+    [Fact]
+    public void Waste_rejects_quantity_above_available_when_units_are_reserved()
+    {
+        var (item, _) = InventoryItem.Initialize(
+            TenantId, StoreId, ProductId, 5, ActorId, "corr", FixedClock.Now);
+        var reservationId = Guid.CreateVersion7();
+        item.Reserve(3, reservationId, ActorId, "corr", FixedClock.Now);
+
+        var ex = Assert.Throws<DomainException>(() =>
+            item.RecordWaste(3, "Merma", ActorId, "corr", FixedClock.Now));
+
+        Assert.Equal("inventory.insufficient_available", ex.Code);
+        Assert.Equal(5, item.OnHand);
+        Assert.Equal(3, item.Reserved);
+    }
+
+    [Fact]
+    public void Reserve_release_and_commit_preserve_balances_and_are_idempotent_on_the_reservation()
+    {
+        var (item, _) = InventoryItem.Initialize(
+            TenantId, StoreId, ProductId, 10, ActorId, "corr", FixedClock.Now);
+        var reservationId = Guid.CreateVersion7();
+
+        var hold = item.Reserve(3, reservationId, ActorId, "corr", FixedClock.Now);
+        Assert.Equal(InventoryMovementType.Reservation, hold.Type);
+        Assert.Equal(InventoryReferenceTypes.InventoryReservation, hold.ReferenceType);
+        Assert.Equal(reservationId, hold.ReferenceId);
+        Assert.Equal(10, item.OnHand);
+        Assert.Equal(3, item.Reserved);
+        Assert.Equal(7, item.Available);
+
+        var released = item.ReleaseReservation(3, reservationId, ActorId, "corr", FixedClock.Now);
+        Assert.Equal(InventoryMovementType.ReservationReleased, released.Type);
+        Assert.Equal(10, item.OnHand);
+        Assert.Equal(0, item.Reserved);
+
+        var (item2, _) = InventoryItem.Initialize(
+            TenantId, StoreId, Guid.CreateVersion7(), 10, ActorId, "corr", FixedClock.Now);
+        var commitId = Guid.CreateVersion7();
+        item2.Reserve(3, commitId, ActorId, "corr", FixedClock.Now);
+        var committed = item2.CommitReservation(3, commitId, ActorId, "corr", FixedClock.Now);
+        Assert.Equal(InventoryMovementType.ReservationCommitted, committed.Type);
+        Assert.Equal(7, item2.OnHand);
+        Assert.Equal(0, item2.Reserved);
+        Assert.Equal(7, item2.Available);
+    }
+
+    [Fact]
+    public void Reserve_rejects_when_available_is_insufficient()
+    {
+        var (item, _) = InventoryItem.Initialize(
+            TenantId, StoreId, ProductId, 2, ActorId, "corr", FixedClock.Now);
+
+        var ex = Assert.Throws<DomainException>(() =>
+            item.Reserve(3, Guid.CreateVersion7(), ActorId, "corr", FixedClock.Now));
+        Assert.Equal("inventory.insufficient_available", ex.Code);
+        Assert.Equal(0, item.Reserved);
     }
 
     [Fact]

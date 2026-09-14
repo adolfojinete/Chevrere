@@ -2,7 +2,7 @@
 
 Plataforma SaaS + quick-commerce sobre una red de dark stores independientes.
 
-Esta fase entrega la fundación técnica, la administración central de asociados, el catálogo comercial, pricing, inventario, abastecimiento y discovery hacia el consumidor: onboarding atómico de Tenant, Franchisee, Owner, primera Store, Plan y Subscription; ciclo de vida (activar, suspender, reactivar) sin borrar datos; catálogo global Chevrere y habilitación por dark store; precio sugerido global y override por Store; ledger de inventario por dark store; proveedores, órdenes de compra y recepción de mercancía; cobertura geolocalizada (PostGIS) y catálogo comercial anónimo; auditoría; multi-tenancy; y autenticación de plataforma.
+Esta fase entrega la fundación técnica, la administración central de asociados, el catálogo comercial, pricing, inventario, abastecimiento, discovery hacia el consumidor y pedidos: onboarding atómico de Tenant, Franchisee, Owner, primera Store, Plan y Subscription; ciclo de vida (activar, suspender, reactivar) sin borrar datos; catálogo global Chevrere y habilitación por dark store; precio sugerido global y override por Store; ledger de inventario por dark store; proveedores, órdenes de compra y recepción de mercancía; cobertura geolocalizada (PostGIS) y catálogo comercial anónimo; carrito y pedidos con reserva de stock; auditoría; multi-tenancy; y autenticación de plataforma.
 
 ## Objetivo
 
@@ -27,7 +27,8 @@ Chevrere
 │       ├── Pricing      (Domain / Application / Infrastructure)
 │       ├── Inventory    (Domain / Application / Infrastructure)
 │       ├── Procurement  (Domain / Application / Infrastructure)
-│       └── Consumer     (Domain / Application / Infrastructure)
+│       ├── Consumer     (Domain / Application / Infrastructure)
+│       └── Orders       (Domain / Application / Infrastructure)
 ├── tests
 │   ├── Chevrere.UnitTests
 │   ├── Chevrere.IntegrationTests
@@ -157,6 +158,7 @@ dotnet run --project src\Chevrere.Api
 21. Admin lectura → `GET /api/v1/admin/stores/{storeId}/purchase-orders` y `.../goods-receipts/{receiptId}`
 22. Admin → `PUT /api/v1/admin/stores/{storeId}/service-area` + `.../enable`
 23. Anónimo → `POST /api/v1/consumer/coverage` y `POST /api/v1/consumer/catalog/search` (lat/lon en body)
+24. Login Consumer → `PUT /api/v1/consumer/cart/items/{productId}` y `POST /api/v1/consumer/orders` (header `Idempotency-Key`)
 
 ## Tests
 
@@ -192,10 +194,11 @@ La solución incluye `SonarAnalyzer.CSharp` (el mismo motor de reglas que SonarQ
 - Suspender no elimina.
 - Consumer Payment ≠ SaaS Subscription.
 - `Money` vive en SharedKernel: el costo de compra y el precio de venta son el mismo concepto.
-- Números de documento (`PO-`, `GR-`) desde secuencias PostgreSQL: únicos, no necesariamente consecutivos.
-- Procurement mueve stock por un puerto de SharedKernel; no referencia Inventory.
+- Números de documento (`PO-`, `GR-`, `ORD-`) desde secuencias PostgreSQL: únicos, no necesariamente consecutivos.
+- Procurement mueve stock por un puerto de SharedKernel; Orders reserva stock por otro puerto del mismo kernel. Ninguno referencia Inventory.
 - Área de servicio (`StoreServiceArea`) ≠ dirección operativa de la Store; APIs de consumidor no filtran store/tenant/stock/coords.
 - Radio de entrega 100..50 000 m (decisión de producto). Suscripción SaaS más allá de `Tenant.Status` = Decision Pending.
+- El JWT del consumidor no lleva tenant. `Confirm` de un pedido no compromete inventario.
 
 ## Documentación
 
@@ -209,3 +212,4 @@ La solución incluye `SonarAnalyzer.CSharp` (el mismo motor de reglas que SonarQ
 - [docs/adr/ADR-007-inventory-ledger-and-balances.md](docs/adr/ADR-007-inventory-ledger-and-balances.md)
 - [docs/adr/ADR-008-procurement-purchase-orders-and-goods-receipts.md](docs/adr/ADR-008-procurement-purchase-orders-and-goods-receipts.md)
 - [docs/adr/ADR-009-consumer-discovery-geolocation-and-catalog.md](docs/adr/ADR-009-consumer-discovery-geolocation-and-catalog.md)
+- [docs/adr/ADR-010-orders-cart-and-inventory-reservations.md](docs/adr/ADR-010-orders-cart-and-inventory-reservations.md)

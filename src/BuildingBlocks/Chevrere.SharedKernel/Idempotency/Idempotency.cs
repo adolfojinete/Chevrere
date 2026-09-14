@@ -11,6 +11,7 @@ public static class IdempotencyOperations
     public const string InventoryWaste = "inventory.waste";
     public const string ProcurementPurchaseOrderCreate = "procurement.purchase_order.create";
     public const string ProcurementReceive = "procurement.receive";
+    public const string OrdersCreate = "orders.create";
 }
 
 public static class IdempotencyKeyRules

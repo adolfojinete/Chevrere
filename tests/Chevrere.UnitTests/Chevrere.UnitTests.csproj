@@ -30,6 +30,8 @@
     <ProjectReference Include="..\..\src\Modules\Consumer\Chevrere.Modules.Consumer.Application\Chevrere.Modules.Consumer.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Pricing\Chevrere.Modules.Pricing.Domain\Chevrere.Modules.Pricing.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Inventory\Chevrere.Modules.Inventory.Domain\Chevrere.Modules.Inventory.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Orders\Chevrere.Modules.Orders.Domain\Chevrere.Modules.Orders.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Orders\Chevrere.Modules.Orders.Application\Chevrere.Modules.Orders.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Procurement\Chevrere.Modules.Procurement.Domain\Chevrere.Modules.Procurement.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Procurement\Chevrere.Modules.Procurement.Application\Chevrere.Modules.Procurement.Application.csproj" />
   </ItemGroup>

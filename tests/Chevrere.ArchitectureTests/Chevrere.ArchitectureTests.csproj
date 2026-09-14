@@ -38,5 +38,8 @@
     <ProjectReference Include="..\..\src\Modules\Procurement\Chevrere.Modules.Procurement.Domain\Chevrere.Modules.Procurement.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Procurement\Chevrere.Modules.Procurement.Application\Chevrere.Modules.Procurement.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Procurement\Chevrere.Modules.Procurement.Infrastructure\Chevrere.Modules.Procurement.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Orders\Chevrere.Modules.Orders.Domain\Chevrere.Modules.Orders.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Orders\Chevrere.Modules.Orders.Application\Chevrere.Modules.Orders.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Orders\Chevrere.Modules.Orders.Infrastructure\Chevrere.Modules.Orders.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

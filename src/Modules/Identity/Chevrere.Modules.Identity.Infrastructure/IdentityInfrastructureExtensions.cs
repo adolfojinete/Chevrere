@@ -27,7 +27,9 @@ public static class IdentityInfrastructureExtensions
             .AddPolicy(AuthorizationPolicies.PlatformSuperAdmin, policy =>
                 policy.RequireRole(RoleNames.PlatformSuperAdmin))
             .AddPolicy(AuthorizationPolicies.FranchiseeOwner, policy =>
-                policy.RequireRole(RoleNames.FranchiseeOwner));
+                policy.RequireRole(RoleNames.FranchiseeOwner))
+            .AddPolicy(AuthorizationPolicies.Consumer, policy =>
+                policy.RequireRole(RoleNames.Consumer));
 
         return services;
     }

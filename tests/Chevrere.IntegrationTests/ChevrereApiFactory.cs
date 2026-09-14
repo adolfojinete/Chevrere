@@ -73,6 +73,10 @@ public sealed class ChevrereApiFactory : WebApplicationFactory<Program>, IAsyncL
         ["PlanSeed:Code"] = "STANDARD",
         ["PlanSeed:Name"] = "Chevrere Standard",
         ["PlanSeed:MonthlyPrice"] = "350000",
-        ["PlanSeed:Currency"] = "COP"
+        ["PlanSeed:Currency"] = "COP",
+        ["Orders:ReservationTtlMinutes"] = "15",
+        ["Orders:ExpirationPollSeconds"] = "60",
+        ["Orders:ExpirationBatchSize"] = "100",
+        ["Orders:ExpirationWorkerEnabled"] = "false"
     };
 }
