@@ -1,6 +1,7 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    # PostGIS, not plain postgres: Consumer Discovery resolves coverage with geography(Point,4326).
+    image: postgis/postgis:17-3.5-alpine
     container_name: chevrere-postgres
     environment:
       POSTGRES_USER: chevrere

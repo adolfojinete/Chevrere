@@ -47,7 +47,7 @@ public static class DependencyInjection
 
         services.AddDbContext<ChevrereDbContext>(options =>
         {
-            options.UseNpgsql(connectionString);
+            options.UseNpgsql(connectionString, npgsql => npgsql.UseNetTopologySuite());
             options.UseSnakeCaseNamingConvention();
         });
 

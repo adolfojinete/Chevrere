@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Chevrere.Modules.Consumer.Application\Chevrere.Modules.Consumer.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Chevrere.Infrastructure\Chevrere.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

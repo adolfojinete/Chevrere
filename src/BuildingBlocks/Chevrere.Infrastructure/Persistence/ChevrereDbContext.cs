@@ -1,6 +1,7 @@
 using Chevrere.Infrastructure.Audit;
 using Chevrere.Infrastructure.Identity;
 using Chevrere.Modules.Catalog.Domain;
+using Chevrere.Modules.Consumer.Domain;
 using Chevrere.Modules.Inventory.Domain;
 using Chevrere.Modules.Pricing.Domain;
 using Chevrere.Modules.Procurement.Domain;
@@ -56,6 +57,8 @@ public sealed class ChevrereDbContext(
 
     public DbSet<GoodsReceiptItem> GoodsReceiptItems => Set<GoodsReceiptItem>();
 
+    public DbSet<StoreServiceArea> StoreServiceAreas => Set<StoreServiceArea>();
+
     public DbSet<IdempotentOperation> IdempotentOperations => Set<IdempotentOperation>();
 
     public bool BypassTenantFilter => tenantFilterBypass.Enabled || currentUser.IsPlatformUser;
@@ -65,6 +68,7 @@ public sealed class ChevrereDbContext(
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+        builder.HasPostgresExtension("postgis");
         builder.ApplyConfigurationsFromAssembly(typeof(ChevrereDbContext).Assembly);
 
         builder.Entity<Tenant>().HasQueryFilter(t => BypassTenantFilter || t.Id == FilterTenantId);
@@ -81,6 +85,7 @@ public sealed class ChevrereDbContext(
         builder.Entity<PurchaseOrderItem>().HasQueryFilter(i => BypassTenantFilter || i.TenantId == FilterTenantId);
         builder.Entity<GoodsReceipt>().HasQueryFilter(r => BypassTenantFilter || r.TenantId == FilterTenantId);
         builder.Entity<GoodsReceiptItem>().HasQueryFilter(i => BypassTenantFilter || i.TenantId == FilterTenantId);
+        builder.Entity<StoreServiceArea>().HasQueryFilter(a => BypassTenantFilter || a.TenantId == FilterTenantId);
 
         // Document numbers are drawn outside the transaction so retries never reuse a number.
         builder.HasSequence<long>("procurement_purchase_order_number_seq").StartsAt(1).IncrementsBy(1);

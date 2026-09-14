@@ -4,7 +4,7 @@
 
 Chevrere es una plataforma SaaS + quick-commerce basada en una red de dark stores independientes.
 
-Hacia el consumidor existe una sola marca y una sola aplicación. Internamente, múltiples operadores/asociados operan una o varias dark stores. El backend es único. Esta fase cubre la administración central de asociados y el catálogo comercial (global + por store).
+Hacia el consumidor existe una sola marca y una sola aplicación. Internamente, múltiples operadores/asociados operan una o varias dark stores. El backend es único. Esta fase cubre la administración central de asociados, el catálogo comercial (global + por store), abastecimiento e inventario, y el discovery geolocalizado hacia el consumidor.
 
 ```text
                        CHEVRERE
@@ -61,6 +61,7 @@ No hay repositorios genéricos. Cada módulo expone puertos de aplicación (`ITe
 | Pricing | Precio sugerido global y override por Store; EffectivePrice |
 | Inventory | Existencia física por Store: balances + ledger inmutable |
 | Procurement | Proveedores, órdenes de compra y recepción de mercancía |
+| Consumer | Discovery geolocalizado: área de servicio, cobertura y catálogo comercial anónimo |
 
 Módulos futuros previstos, no implementados: Orders, Payments, Billing, Operations, Notifications.
 
@@ -99,17 +100,19 @@ EffectivePrice = StoreOverride ?? SuggestedPrice ?? null
 
 Orders futuro debe guardar snapshot de precio en el ítem; no recalcular desde histórico.
 
-Disponibilidad comercial efectiva (sin stock todavía en fases previas):
+Disponibilidad comercial hacia consumidor (implementada en Consumer Discovery):
 
 ```text
-Category.Active AND GlobalProduct.Active AND StoreProduct.Enabled
+Category.Active
+AND GlobalProduct.Active
+AND StoreProduct.Enabled
+AND EffectivePrice != null          -- COALESCE(store override, suggested); ValidTo IS NULL
+AND Inventory (OnHand - Reserved) > 0
+AND Tenant.Active AND Store.Active
+AND StoreServiceArea.IsEnabled y el punto del consumidor dentro del radio (PostGIS)
 ```
 
-Disponibilidad futura hacia consumidor (no implementada aún):
-
-```text
-StoreProduct Enabled AND EffectivePrice != null AND Inventory.Available > 0
-```
+Detalle: [ADR-009](adr/ADR-009-consumer-discovery-geolocation-and-catalog.md).
 
 ## Inventory
 
@@ -122,6 +125,14 @@ El stock también entra por la puerta del proveedor: `Supplier` → `PurchaseOrd
 Recibir mercancía escribe en un solo `SaveChanges`: cantidades de la orden, el recibo con sus líneas, el `InventoryMovement` de tipo `Receipt` (referenciando el `GoodsReceiptItem`), la operación idempotente y la auditoría. Si la store aún no gestionaba stock del producto, el ingreso crea el `InventoryItem` en cero; si ya había, se suma.
 
 Los números de documento (`PO-000001`, `GR-000001`) salen de secuencias PostgreSQL. `POST` de orden y de recepción exigen `Idempotency-Key`; el replay responde el snapshot original del recibo aunque la orden haya avanzado después. Detalle: [ADR-008](adr/ADR-008-procurement-purchase-orders-and-goods-receipts.md).
+
+## Consumer Discovery
+
+El consumidor pregunta cobertura y catálogo con lat/lon en el body (nunca en la URL). Un `StoreServiceArea` (PostGIS `geography(Point,4326)` + radio 100..50 000 m) es distinto de la dirección operativa de la Store: las APIs anónimas no usan `AddressInternal` / `Latitude` / `Longitude` de `Store`.
+
+`IConsumerStoreResolver` elige como máximo una dark store elegible (`Tenant` Active, `Store` Active, área enabled, `ST_DWithin`) ordenando por distancia y `StoreId`. Cobertura, catálogo, categorías y detalle de producto re-resuelven siempre desde las coordenadas; no hay `FulfillmentContextId`.
+
+Los DTOs de consumidor no incluyen store/tenant ids, stock, distancia ni coordenadas. Sin cobertura o producto no visible → 404 en detalle (indistinguible). Lecturas anónimas no auditan ni persisten la ubicación del consumidor. Suscripción SaaS más allá de `Tenant.Status` = Decision Pending (no se inventa billing). Detalle: [ADR-009](adr/ADR-009-consumer-discovery-geolocation-and-catalog.md).
 
 ## Catálogo y ciclo de vida
 
@@ -140,6 +151,7 @@ flowchart TD
     Api --> PricingInfra[Pricing.Infrastructure]
     Api --> InventoryInfra[Inventory.Infrastructure]
     Api --> ProcInfra[Procurement.Infrastructure]
+    Api --> ConsumerInfra[Consumer.Infrastructure]
     Api --> SharedInfra[Chevrere.Infrastructure]
 
     IdentityInfra --> IdentityApp[Identity.Application]
@@ -149,6 +161,7 @@ flowchart TD
     PricingInfra --> PricingApp[Pricing.Application]
     InventoryInfra --> InventoryApp[Inventory.Application]
     ProcInfra --> ProcApp[Procurement.Application]
+    ConsumerInfra --> ConsumerApp[Consumer.Application]
 
     TenancyApp --> IdentityApp
     TenancyApp --> SubsApp
@@ -160,6 +173,7 @@ flowchart TD
     PricingApp --> PricingDomain[Pricing.Domain]
     InventoryApp --> InventoryDomain[Inventory.Domain]
     ProcApp --> ProcDomain[Procurement.Domain]
+    ConsumerApp --> ConsumerDomain[Consumer.Domain]
 
     ProcApp --> SharedKernel[SharedKernel]
     InventoryInfra --> SharedKernel
@@ -168,12 +182,13 @@ flowchart TD
     SharedInfra --> PricingDomain
     SharedInfra --> InventoryDomain
     SharedInfra --> ProcDomain
+    SharedInfra --> ConsumerDomain
     SharedInfra --> TenancyDomain
     SharedInfra --> SubsDomain
     SharedInfra --> SharedKernel
 ```
 
-Tenancy.Application orquesta el onboarding. Identity y Subscriptions no conocen Tenancy. Pricing e Inventory no dependen de Catalog Application/Domain. Procurement.Application solo alcanza Inventory por `Chevrere.SharedKernel.Inventory`; tests de arquitectura lo verifican en ambos sentidos.
+Tenancy.Application orquesta el onboarding. Identity y Subscriptions no conocen Tenancy. Pricing e Inventory no dependen de Catalog Application/Domain. Procurement.Application solo alcanza Inventory por `Chevrere.SharedKernel.Inventory`; tests de arquitectura lo verifican en ambos sentidos. Consumer.Domain y Consumer.Application no referencian Catalog, Pricing, Inventory ni Tenancy; la composición vive en Consumer.Infrastructure.
 
 ## Multi-tenancy
 
@@ -189,9 +204,9 @@ User autenticado
   → Query filters de EF Core
 ```
 
-Filtros globales en `Tenant`, `Franchisee`, `Store`, `Subscription`, `AuditEvent`, `StoreProduct`, `InventoryItem`, `InventoryMovement`, `Supplier`, `PurchaseOrder` y `GoodsReceipt`. `Category` y `GlobalProduct` no se filtran por tenant. Los usuarios de plataforma (`PlatformSuperAdmin`, `PlatformAdmin`, `PlatformSupport`) omiten los filtros. Los endpoints `/api/v1/business/*` no aceptan `tenantId` del request. Una Store ajena responde 404.
+Filtros globales en `Tenant`, `Franchisee`, `Store`, `Subscription`, `AuditEvent`, `StoreProduct`, `InventoryItem`, `InventoryMovement`, `Supplier`, `PurchaseOrder`, `GoodsReceipt` y `StoreServiceArea`. `Category` y `GlobalProduct` no se filtran por tenant. Los usuarios de plataforma (`PlatformSuperAdmin`, `PlatformAdmin`, `PlatformSupport`) omiten los filtros. Los endpoints `/api/v1/business/*` no aceptan `tenantId` del request. Una Store ajena responde 404.
 
-`User.TenantId` nulo identifica personal de plataforma. Un Owner siempre nace ligado al tenant creado.
+`User.TenantId` nulo identifica personal de plataforma. Un Owner siempre nace ligado al tenant creado. Las lecturas anónimas de Consumer Discovery no tienen tenant: el resolver usa SQL con filtros explícitos (`IgnoreQueryFilters` solo ahí).
 
 ## Tenant vs Franchisee vs Store
 
@@ -203,7 +218,7 @@ Tenant          aislamiento SaaS
 
 Nunca se asume `FranchiseeId = StoreId`. Una Store no puede crearse si su Franchisee pertenece a otro Tenant: la invariante vive en el dominio y se refuerza con FK + tests.
 
-La dirección exacta de la Store es operacional y no se considera pública.
+La dirección exacta de la Store es operacional y no se considera pública. El área de entrega al consumidor (`StoreServiceArea`) es un agregado aparte: su geometría puede exponerse en admin/business, nunca en respuestas de `/api/v1/consumer/*`.
 
 ## Suscripción
 
@@ -243,7 +258,7 @@ Crear, activar, suspender y reactivar asociados, y mutar el catálogo global, ex
 
 Cada request recibe o genera un `X-Correlation-ID`. Se propaga a logs y a `audit_events`.
 
-Se registran creación de tenant, franchisee, store, owner, subscription, activación, suspensión, reactivación y cambio de plan; mutaciones de Catalog; cambios de Pricing; Inventory (`InventoryInitialized`, `InventoryAdjusted`, `InventoryWasteRecorded`); y Procurement (ciclo de vida de `Supplier` y `PurchaseOrder`, más `GoodsReceiptRecorded`). Los snapshots JSONB no incluyen contraseñas.
+Se registran creación de tenant, franchisee, store, owner, subscription, activación, suspensión, reactivación y cambio de plan; mutaciones de Catalog; cambios de Pricing; Inventory (`InventoryInitialized`, `InventoryAdjusted`, `InventoryWasteRecorded`); Procurement (ciclo de vida de `Supplier` y `PurchaseOrder`, más `GoodsReceiptRecorded`); y Consumer Discovery (`StoreServiceAreaConfigured` / `Enabled` / `Disabled`). Los snapshots JSONB no incluyen contraseñas. Las lecturas anónimas de cobertura/catálogo no generan auditoría ni persisten la ubicación del consumidor.
 
 `AuditEvent` representa una **mutación empresarial real**, no cada llamada HTTP. Un comando idempotente que pide el estado actual (p. ej. Enable cuando ya está Enabled, Activate cuando ya está Active) responde success sin cambiar `UpdatedAt`, sin `SaveChanges` y sin nuevo evento de auditoría. Serilog puede seguir registrando el request; la auditoría no.
 
@@ -251,9 +266,9 @@ Se registran creación de tenant, franchisee, store, owner, subscription, activa
 
 ## Base de datos
 
-PostgreSQL único. EF Core + Npgsql. Nombres `snake_case`. Enums como `text`. `timestamp with time zone` vía `DateTimeOffset`. Identificadores UUID v7.
+PostgreSQL único con extensión **PostGIS** (imagen `postgis/postgis:17-3.5-alpine` en docker-compose y Testcontainers). EF Core + Npgsql + NetTopologySuite. Nombres `snake_case`. Enums como `text`. `timestamp with time zone` vía `DateTimeOffset`. Identificadores UUID v7.
 
-No hay `EnsureCreated()`. Las migraciones viven en `Chevrere.Infrastructure`. La API las aplica al arrancar, antes del seed. También pueden ejecutarse a mano con `dotnet ef database update`.
+No hay `EnsureCreated()`. Las migraciones viven en `Chevrere.Infrastructure`. La API las aplica al arrancar, antes del seed. También pueden ejecutarse a mano con `dotnet ef database update`. La migración `AddConsumerDiscovery` habilita `CREATE EXTENSION postgis` y crea `store_service_areas` con índice GiST.
 
 Soft delete: no se usa. El historial empresarial se conserva con `Status`. `AuditEvent` es append-only.
 
@@ -261,9 +276,9 @@ Soft delete: no se usa. El historial empresarial se conserva con `Status`. `Audi
 
 Una sola API, tres superficies:
 
-- `/api/v1/admin/*` — administración Chevrere
-- `/api/v1/business/*` — back-office del asociado (mínimo en esta fase)
-- `/api/v1/app/*` — consumidor (futuro)
+- `/api/v1/admin/*` — administración Chevrere (incluye configurar/habilitar área de servicio)
+- `/api/v1/business/*` — back-office del asociado (incluye lectura del área de su store)
+- `/api/v1/consumer/*` — discovery anónimo (cobertura, catálogo, categorías, detalle)
 
 Versionado por URL (`v1`). Sin librería extra.
 
