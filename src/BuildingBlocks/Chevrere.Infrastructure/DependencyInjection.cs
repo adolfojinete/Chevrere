@@ -1,11 +1,13 @@
 using Chevrere.Infrastructure.Audit;
 using Chevrere.Infrastructure.Context;
+using Chevrere.Infrastructure.Idempotency;
 using Chevrere.Infrastructure.Identity;
 using Chevrere.Infrastructure.Options;
 using Chevrere.Infrastructure.Persistence;
 using Chevrere.Infrastructure.Seed;
 using Chevrere.SharedKernel.Audit;
 using Chevrere.SharedKernel.Context;
+using Chevrere.SharedKernel.Idempotency;
 using Chevrere.SharedKernel.Persistence;
 using Chevrere.SharedKernel.Time;
 using Microsoft.AspNetCore.Identity;
@@ -27,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<ICorrelationContext, CorrelationContext>();
         services.AddScoped<ITenantFilterBypass, TenantFilterBypass>();
         services.AddScoped<IAuditRecorder, AuditRecorder>();
+        services.AddScoped<IIdempotencyStore, EfIdempotencyStore>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<DatabaseSeeder>();
 

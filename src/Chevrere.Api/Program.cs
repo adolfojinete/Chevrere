@@ -8,6 +8,7 @@ using Chevrere.Infrastructure.Persistence;
 using Chevrere.Infrastructure.Seed;
 using Chevrere.Modules.Catalog.Infrastructure;
 using Chevrere.Modules.Identity.Infrastructure;
+using Chevrere.Modules.Inventory.Infrastructure;
 using Chevrere.Modules.Pricing.Infrastructure;
 using Chevrere.Modules.Subscriptions.Infrastructure;
 using Chevrere.Modules.Tenancy.Infrastructure;
@@ -48,7 +49,7 @@ try
         {
             Title = "Chevrere API",
             Version = "v1",
-            Description = "Administración central de asociados, catálogo global, catálogo por dark store y pricing."
+            Description = "Administración central de asociados, catálogo, pricing e inventario por dark store."
         });
         options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
@@ -58,6 +59,13 @@ try
             Type = SecuritySchemeType.Http,
             Scheme = "bearer",
             BearerFormat = "JWT"
+        });
+        options.AddSecurityDefinition("IdempotencyKey", new OpenApiSecurityScheme
+        {
+            Description = "Clave de idempotencia para mutaciones de inventario (8-128 chars).",
+            Name = "Idempotency-Key",
+            In = ParameterLocation.Header,
+            Type = SecuritySchemeType.ApiKey
         });
         options.AddSecurityRequirement(new OpenApiSecurityRequirement
         {
@@ -69,6 +77,7 @@ try
                 Array.Empty<string>()
             }
         });
+        options.OperationFilter<Chevrere.Api.Swagger.IdempotencyKeyOperationFilter>();
     });
 
     builder.Services.AddChevrereInfrastructure(builder.Configuration);
@@ -77,6 +86,7 @@ try
     builder.Services.AddSubscriptionsModule();
     builder.Services.AddCatalogModule();
     builder.Services.AddPricingModule();
+    builder.Services.AddInventoryModule();
 
     var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
         ?? throw new InvalidOperationException("Jwt configuration is missing.");
