@@ -182,6 +182,7 @@ public sealed record RemoveStoreOverridePriceCommand(Guid StoreId, Guid GlobalPr
 public sealed class RemoveStoreOverridePriceHandler(
     IPricingStore store,
     IPricingStoreAccess storeAccess,
+    IPricingCatalogAccess catalog,
     ICurrentUser currentUser,
     IAuditRecorder audit,
     IUnitOfWork unitOfWork,
@@ -199,6 +200,17 @@ public sealed class RemoveStoreOverridePriceHandler(
         if (storeTenantId is null || storeTenantId != tenantId)
         {
             return Result.Failure(Error.NotFound(ErrorCodes.NotFound, "Store not found."));
+        }
+
+        if (!await catalog.GlobalProductExistsAsync(request.GlobalProductId, cancellationToken))
+        {
+            return Result.Failure(Error.NotFound(ErrorCodes.NotFound, "Product not found."));
+        }
+
+        if (!await storeAccess.StoreProductExistsAsync(tenantId, request.StoreId, request.GlobalProductId, cancellationToken))
+        {
+            return Result.Failure(
+                Error.Conflict("store_price.product.not_offered", "The store has not enabled this product."));
         }
 
         var current = await store.GetCurrentStorePriceAsync(request.StoreId, request.GlobalProductId, cancellationToken);

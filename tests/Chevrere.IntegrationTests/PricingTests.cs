@@ -11,6 +11,7 @@ using Chevrere.Modules.Tenancy.Application.Contracts;
 using Chevrere.SharedKernel.Audit;
 using Chevrere.SharedKernel.Context;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -133,6 +134,59 @@ public sealed class PricingTests(ChevrereApiFactory factory)
         Assert.Equal(6200m, priced.EffectivePrice!.Amount);
         Assert.Equal(PriceSource.Store, priced.Source);
         Assert.Null(priced.SuggestedPrice);
+
+        var remove = await owner.DeleteAsync(
+            $"/api/v1/business/stores/{franchisee.StoreId}/products/{product.Id}/price");
+        Assert.Equal(HttpStatusCode.NoContent, remove.StatusCode);
+        var afterRemove = await owner.GetFromJsonAsync<StoreEffectivePriceDto>(
+            $"/api/v1/business/stores/{franchisee.StoreId}/products/{product.Id}/price",
+            AuthHelper.Json);
+        Assert.NotNull(afterRemove);
+        Assert.Null(afterRemove.EffectivePrice);
+        Assert.Equal(PriceSource.None, afterRemove.Source);
+        Assert.Equal(1, await CountStorePriceRemovedAuditsAsync(franchisee.StoreId, product.Id));
+    }
+
+    [Fact]
+    public async Task Remove_override_requires_valid_product_association_and_allows_noop()
+    {
+        using var admin = await AuthHelper.AuthenticatedAdminAsync(factory);
+        var category = await CatalogAdminTests.CreateCategoryAsync(admin, "BEB-RMOV", "Bebidas Remove");
+        var offered = await CatalogAdminTests.CreateProductAsync(
+            admin,
+            category.Id,
+            "SKU-RMOV-1",
+            "Producto Remove Offered",
+            null);
+        var notOffered = await CatalogAdminTests.CreateProductAsync(
+            admin,
+            category.Id,
+            "SKU-RMOV-2",
+            "Producto Remove Not Offered",
+            null);
+        var franchisee = await CreateFranchiseeAsync(admin, "RMOV1", "owner-rmov1@example.com", "918991201");
+        using var owner = await OwnerClientAsync("owner-rmov1@example.com");
+
+        (await owner.PostAsync(
+            $"/api/v1/business/stores/{franchisee.StoreId}/products/{offered.Id}/enable",
+            null)).EnsureSuccessStatusCode();
+
+        var missingProduct = await owner.DeleteAsync(
+            $"/api/v1/business/stores/{franchisee.StoreId}/products/{Guid.CreateVersion7()}/price");
+        Assert.Equal(HttpStatusCode.NotFound, missingProduct.StatusCode);
+
+        var notAssociated = await owner.DeleteAsync(
+            $"/api/v1/business/stores/{franchisee.StoreId}/products/{notOffered.Id}/price");
+        Assert.Equal(HttpStatusCode.Conflict, notAssociated.StatusCode);
+        var problem = await notAssociated.Content.ReadFromJsonAsync<ProblemDetails>(AuthHelper.Json);
+        Assert.NotNull(problem);
+        Assert.Equal("store_price.product.not_offered", problem.Title);
+
+        var noop = await owner.DeleteAsync(
+            $"/api/v1/business/stores/{franchisee.StoreId}/products/{offered.Id}/price");
+        Assert.Equal(HttpStatusCode.NoContent, noop.StatusCode);
+        Assert.Equal(0, await CountStorePriceRemovedAuditsAsync(franchisee.StoreId, offered.Id));
+        Assert.Equal(0, await CountStorePriceHistoryAsync(franchisee.StoreId, offered.Id));
     }
 
     [Fact]
@@ -152,6 +206,10 @@ public sealed class PricingTests(ChevrereApiFactory factory)
             $"/api/v1/business/stores/{b.StoreId}/products/{product.Id}/price",
             new SetPriceRequest(1000m, "COP"));
         Assert.Equal(HttpStatusCode.NotFound, foreign.StatusCode);
+
+        var foreignDelete = await ownerA.DeleteAsync(
+            $"/api/v1/business/stores/{b.StoreId}/products/{product.Id}/price");
+        Assert.Equal(HttpStatusCode.NotFound, foreignDelete.StatusCode);
 
         await EnsureSupportUserAsync();
         using var support = factory.CreateClientUnredirected();
@@ -276,6 +334,14 @@ public sealed class PricingTests(ChevrereApiFactory factory)
         return await db.Set<AuditEvent>().CountAsync(e =>
             (e.Action == AuditActions.StorePriceSet || e.Action == AuditActions.StorePriceChanged)
             && priceIds.Contains(e.EntityId));
+    }
+
+    private async Task<int> CountStorePriceHistoryAsync(Guid storeId, Guid productId)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<ITenantFilterBypass>().Enabled = true;
+        var db = scope.ServiceProvider.GetRequiredService<ChevrereDbContext>();
+        return await db.StoreProductPrices.CountAsync(p => p.StoreId == storeId && p.GlobalProductId == productId);
     }
 
     private async Task<int> CountStorePriceRemovedAuditsAsync(Guid storeId, Guid productId)
