@@ -2,7 +2,7 @@
 
 Plataforma SaaS + quick-commerce sobre una red de dark stores independientes.
 
-Esta fase entrega la fundación técnica, la administración central de asociados y el catálogo comercial: onboarding atómico de Tenant, Franchisee, Owner, primera Store, Plan y Subscription; ciclo de vida (activar, suspender, reactivar) sin borrar datos; catálogo global Chevrere y habilitación por dark store; auditoría; multi-tenancy; y autenticación de plataforma.
+Esta fase entrega la fundación técnica, la administración central de asociados, el catálogo comercial y pricing: onboarding atómico de Tenant, Franchisee, Owner, primera Store, Plan y Subscription; ciclo de vida (activar, suspender, reactivar) sin borrar datos; catálogo global Chevrere y habilitación por dark store; precio sugerido global y override por Store; auditoría; multi-tenancy; y autenticación de plataforma.
 
 ## Objetivo
 
@@ -23,7 +23,8 @@ Chevrere
 │       ├── Identity     (Domain / Application / Infrastructure)
 │       ├── Tenancy      (Domain / Application / Infrastructure)
 │       ├── Subscriptions(Domain / Application / Infrastructure)
-│       └── Catalog      (Domain / Application / Infrastructure)
+│       ├── Catalog      (Domain / Application / Infrastructure)
+│       └── Pricing      (Domain / Application / Infrastructure)
 ├── tests
 │   ├── Chevrere.UnitTests
 │   ├── Chevrere.IntegrationTests
@@ -141,6 +142,8 @@ dotnet run --project src\Chevrere.Api
 10. `POST /api/v1/admin/categories` y `POST /api/v1/admin/products`
 11. Login Owner → `GET /api/v1/business/catalog/products`
 12. `POST /api/v1/business/stores/{storeId}/products/{productId}/enable`
+13. `PUT /api/v1/admin/products/{productId}/price` (SuggestedPrice)
+14. Owner → `PUT/GET/DELETE /api/v1/business/stores/{storeId}/products/{productId}/price`
 
 ## Tests
 

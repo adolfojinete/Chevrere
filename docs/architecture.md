@@ -58,8 +58,9 @@ No hay repositorios genéricos. Cada módulo expone puertos de aplicación (`ITe
 | Tenancy | Tenant, Franchisee, Store, onboarding y ciclo de vida administrativo |
 | Subscriptions | Planes SaaS y suscripción del tenant. Distinto de pagos del consumidor |
 | Catalog | Catálogo global Chevrere y opt-in comercial por Store |
+| Pricing | Precio sugerido global y override por Store; EffectivePrice |
 
-Módulos futuros previstos, no implementados: Pricing, Inventory, Orders, Payments, Billing, Operations, Notifications.
+Módulos futuros previstos, no implementados: Inventory, Orders, Payments, Billing, Operations, Notifications.
 
 ## Catálogo
 
@@ -72,10 +73,24 @@ GlobalProduct (global, una presentación = un SKU)
    ↓
 StoreProduct (tenant + store)
    ↓
-Pricing / Inventory / Orders   ← futuro
+Pricing (Suggested + Store override → EffectivePrice)
+   ↓
+Inventory / Orders   ← futuro
 ```
 
 `Category` y `GlobalProduct` **no** tienen `TenantId`. Son de la plataforma. `StoreProduct` **sí** pertenece a un tenant y referencia `Store (Id, TenantId)` con FK compuesta.
+
+## Pricing
+
+Chevrere define un **SuggestedPrice** global por producto. Cada Store puede definir un **override**. El precio que aplica es:
+
+```text
+EffectivePrice = StoreOverride ?? SuggestedPrice ?? null
+```
+
+`Source` derivado: `Store` | `Global` | `None`. Histórico versionado con `ValidFrom`/`ValidTo` (vigente = `ValidTo IS NULL`). Idempotencia de set/remove sin audit falso. Detalle: [ADR-006](adr/ADR-006-pricing-global-suggested-store-override.md).
+
+Orders futuro debe guardar snapshot de precio en el ítem; no recalcular desde histórico.
 
 Disponibilidad comercial efectiva (sin stock todavía):
 
