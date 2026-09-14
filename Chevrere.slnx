@@ -17,6 +17,11 @@
     <Project Path="src/Modules/Pricing/Chevrere.Modules.Pricing.Domain/Chevrere.Modules.Pricing.Domain.csproj" />
     <Project Path="src/Modules/Pricing/Chevrere.Modules.Pricing.Infrastructure/Chevrere.Modules.Pricing.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Inventory/">
+    <Project Path="src/Modules/Inventory/Chevrere.Modules.Inventory.Application/Chevrere.Modules.Inventory.Application.csproj" />
+    <Project Path="src/Modules/Inventory/Chevrere.Modules.Inventory.Domain/Chevrere.Modules.Inventory.Domain.csproj" />
+    <Project Path="src/Modules/Inventory/Chevrere.Modules.Inventory.Infrastructure/Chevrere.Modules.Inventory.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Identity/">
     <Project Path="src/Modules/Identity/Chevrere.Modules.Identity.Application/Chevrere.Modules.Identity.Application.csproj" />
     <Project Path="src/Modules/Identity/Chevrere.Modules.Identity.Domain/Chevrere.Modules.Identity.Domain.csproj" />

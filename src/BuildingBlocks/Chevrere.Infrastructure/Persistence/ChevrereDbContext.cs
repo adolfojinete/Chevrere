@@ -1,10 +1,12 @@
 using Chevrere.Infrastructure.Audit;
 using Chevrere.Infrastructure.Identity;
 using Chevrere.Modules.Catalog.Domain;
+using Chevrere.Modules.Inventory.Domain;
 using Chevrere.Modules.Pricing.Domain;
 using Chevrere.Modules.Subscriptions.Domain;
 using Chevrere.Modules.Tenancy.Domain;
 using Chevrere.SharedKernel.Context;
+using Chevrere.SharedKernel.Idempotency;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +41,12 @@ public sealed class ChevrereDbContext(
 
     public DbSet<StoreProductPrice> StoreProductPrices => Set<StoreProductPrice>();
 
+    public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
+
+    public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
+
+    public DbSet<IdempotentOperation> IdempotentOperations => Set<IdempotentOperation>();
+
     public bool BypassTenantFilter => tenantFilterBypass.Enabled || currentUser.IsPlatformUser;
 
     public Guid FilterTenantId => currentUser.TenantId ?? Guid.Empty;
@@ -55,6 +63,8 @@ public sealed class ChevrereDbContext(
         builder.Entity<AuditEvent>().HasQueryFilter(a => BypassTenantFilter || a.TenantId == FilterTenantId);
         builder.Entity<StoreProduct>().HasQueryFilter(s => BypassTenantFilter || s.TenantId == FilterTenantId);
         builder.Entity<StoreProductPrice>().HasQueryFilter(s => BypassTenantFilter || s.TenantId == FilterTenantId);
+        builder.Entity<InventoryItem>().HasQueryFilter(i => BypassTenantFilter || i.TenantId == FilterTenantId);
+        builder.Entity<InventoryMovement>().HasQueryFilter(m => BypassTenantFilter || m.TenantId == FilterTenantId);
 
         builder.Entity<ApplicationUser>().ToTable("users");
         builder.Entity<ApplicationRole>().ToTable("roles");

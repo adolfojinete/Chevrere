@@ -2,7 +2,7 @@
 
 Plataforma SaaS + quick-commerce sobre una red de dark stores independientes.
 
-Esta fase entrega la fundación técnica, la administración central de asociados, el catálogo comercial y pricing: onboarding atómico de Tenant, Franchisee, Owner, primera Store, Plan y Subscription; ciclo de vida (activar, suspender, reactivar) sin borrar datos; catálogo global Chevrere y habilitación por dark store; precio sugerido global y override por Store; auditoría; multi-tenancy; y autenticación de plataforma.
+Esta fase entrega la fundación técnica, la administración central de asociados, el catálogo comercial, pricing e inventario: onboarding atómico de Tenant, Franchisee, Owner, primera Store, Plan y Subscription; ciclo de vida (activar, suspender, reactivar) sin borrar datos; catálogo global Chevrere y habilitación por dark store; precio sugerido global y override por Store; ledger de inventario por dark store; auditoría; multi-tenancy; y autenticación de plataforma.
 
 ## Objetivo
 
@@ -24,7 +24,8 @@ Chevrere
 │       ├── Tenancy      (Domain / Application / Infrastructure)
 │       ├── Subscriptions(Domain / Application / Infrastructure)
 │       ├── Catalog      (Domain / Application / Infrastructure)
-│       └── Pricing      (Domain / Application / Infrastructure)
+│       ├── Pricing      (Domain / Application / Infrastructure)
+│       └── Inventory    (Domain / Application / Infrastructure)
 ├── tests
 │   ├── Chevrere.UnitTests
 │   ├── Chevrere.IntegrationTests
@@ -144,6 +145,8 @@ dotnet run --project src\Chevrere.Api
 12. `POST /api/v1/business/stores/{storeId}/products/{productId}/enable`
 13. `PUT /api/v1/admin/products/{productId}/price` (SuggestedPrice)
 14. Owner → `PUT/GET/DELETE /api/v1/business/stores/{storeId}/products/{productId}/price`
+15. Owner → inventory list/get/movements + initialize/adjustments/waste (header `Idempotency-Key`)
+16. Admin lectura → `GET /api/v1/admin/stores/{storeId}/inventory`
 
 ## Tests
 
@@ -187,3 +190,5 @@ La solución incluye `SonarAnalyzer.CSharp` (el mismo motor de reglas que SonarQ
 - [docs/adr/ADR-003-multitenancy.md](docs/adr/ADR-003-multitenancy.md)
 - [docs/adr/ADR-004-identity.md](docs/adr/ADR-004-identity.md)
 - [docs/adr/ADR-005-global-catalog-store-catalog.md](docs/adr/ADR-005-global-catalog-store-catalog.md)
+- [docs/adr/ADR-006-pricing-global-suggested-store-override.md](docs/adr/ADR-006-pricing-global-suggested-store-override.md)
+- [docs/adr/ADR-007-inventory-ledger-and-balances.md](docs/adr/ADR-007-inventory-ledger-and-balances.md)

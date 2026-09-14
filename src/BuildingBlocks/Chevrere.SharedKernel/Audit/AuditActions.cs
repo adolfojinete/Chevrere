@@ -28,4 +28,7 @@ public static class AuditActions
     public const string StorePriceSet = "store_product_price.set";
     public const string StorePriceChanged = "store_product_price.changed";
     public const string StorePriceRemoved = "store_product_price.removed";
+    public const string InventoryInitialized = "inventory.initialized";
+    public const string InventoryAdjusted = "inventory.adjusted";
+    public const string InventoryWasteRecorded = "inventory.waste_recorded";
 }

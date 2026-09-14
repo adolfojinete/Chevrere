@@ -59,8 +59,9 @@ No hay repositorios genéricos. Cada módulo expone puertos de aplicación (`ITe
 | Subscriptions | Planes SaaS y suscripción del tenant. Distinto de pagos del consumidor |
 | Catalog | Catálogo global Chevrere y opt-in comercial por Store |
 | Pricing | Precio sugerido global y override por Store; EffectivePrice |
+| Inventory | Existencia física por Store: balances + ledger inmutable |
 
-Módulos futuros previstos, no implementados: Inventory, Orders, Payments, Billing, Operations, Notifications.
+Módulos futuros previstos, no implementados: Orders, Payments, Billing, Operations, Notifications.
 
 ## Catálogo
 
@@ -75,9 +76,12 @@ StoreProduct (tenant + store)
    ↓
 Pricing (Suggested + Store override → EffectivePrice)
    ↓
-Inventory / Orders   ← futuro
+Inventory (OnHand / Reserved / Available + ledger)
+   ↓
+Orders   ← futuro
 ```
 
+Las flechas describen composición funcional (qué capa responde qué pregunta), no necesariamente project references. Inventory no referencia Pricing ni Catalog Domain; proyecta SKU/Name vía Infrastructure.
 `Category` y `GlobalProduct` **no** tienen `TenantId`. Son de la plataforma. `StoreProduct` **sí** pertenece a un tenant y referencia `Store (Id, TenantId)` con FK compuesta.
 
 ## Pricing
@@ -92,11 +96,21 @@ EffectivePrice = StoreOverride ?? SuggestedPrice ?? null
 
 Orders futuro debe guardar snapshot de precio en el ítem; no recalcular desde histórico.
 
-Disponibilidad comercial efectiva (sin stock todavía):
+Disponibilidad comercial efectiva (sin stock todavía en fases previas):
 
 ```text
 Category.Active AND GlobalProduct.Active AND StoreProduct.Enabled
 ```
+
+Disponibilidad futura hacia consumidor (no implementada aún):
+
+```text
+StoreProduct Enabled AND EffectivePrice != null AND Inventory.Available > 0
+```
+
+## Inventory
+
+Cada Store gestiona stock por `GlobalProduct` ofrecido (`StoreProduct`). El estado actual vive en `InventoryItem` (`OnHand`, `Reserved`); la historia en `InventoryMovement` inmutable. `Available` se deriva. Mutaciones manuales (Initialize / Adjust / Waste) exigen `Idempotency-Key`. Detalle: [ADR-007](adr/ADR-007-inventory-ledger-and-balances.md).
 
 Desactivar una categoría o un producto global no borra `StoreProduct`. Solo deja de ser comercialmente disponible. Una categoría inactiva no desactiva físicamente sus productos.
 
@@ -110,12 +124,16 @@ flowchart TD
     Api --> TenancyInfra[Tenancy.Infrastructure]
     Api --> SubsInfra[Subscriptions.Infrastructure]
     Api --> CatalogInfra[Catalog.Infrastructure]
+    Api --> PricingInfra[Pricing.Infrastructure]
+    Api --> InventoryInfra[Inventory.Infrastructure]
     Api --> SharedInfra[Chevrere.Infrastructure]
 
     IdentityInfra --> IdentityApp[Identity.Application]
     TenancyInfra --> TenancyApp[Tenancy.Application]
     SubsInfra --> SubsApp[Subscriptions.Application]
     CatalogInfra --> CatalogApp[Catalog.Application]
+    PricingInfra --> PricingApp[Pricing.Application]
+    InventoryInfra --> InventoryApp[Inventory.Application]
 
     TenancyApp --> IdentityApp
     TenancyApp --> SubsApp
@@ -124,14 +142,18 @@ flowchart TD
     TenancyApp --> TenancyDomain[Tenancy.Domain]
     SubsApp --> SubsDomain[Subscriptions.Domain]
     CatalogApp --> CatalogDomain[Catalog.Domain]
+    PricingApp --> PricingDomain[Pricing.Domain]
+    InventoryApp --> InventoryDomain[Inventory.Domain]
 
     SharedInfra --> CatalogDomain
+    SharedInfra --> PricingDomain
+    SharedInfra --> InventoryDomain
     SharedInfra --> TenancyDomain
     SharedInfra --> SubsDomain
     SharedInfra --> SharedKernel[SharedKernel]
 ```
 
-Tenancy.Application orquesta el onboarding. Identity y Subscriptions no conocen Tenancy.
+Tenancy.Application orquesta el onboarding. Identity y Subscriptions no conocen Tenancy. Pricing e Inventory no dependen de Catalog Application/Domain.
 
 ## Multi-tenancy
 
@@ -147,7 +169,7 @@ User autenticado
   → Query filters de EF Core
 ```
 
-Filtros globales en `Tenant`, `Franchisee`, `Store`, `Subscription`, `AuditEvent` y `StoreProduct`. `Category` y `GlobalProduct` no se filtran por tenant. Los usuarios de plataforma (`PlatformSuperAdmin`, `PlatformAdmin`, `PlatformSupport`) omiten los filtros. Los endpoints `/api/v1/business/*` no aceptan `tenantId` del request. Una Store ajena responde 404.
+Filtros globales en `Tenant`, `Franchisee`, `Store`, `Subscription`, `AuditEvent`, `StoreProduct`, `InventoryItem` e `InventoryMovement`. `Category` y `GlobalProduct` no se filtran por tenant. Los usuarios de plataforma (`PlatformSuperAdmin`, `PlatformAdmin`, `PlatformSupport`) omiten los filtros. Los endpoints `/api/v1/business/*` no aceptan `tenantId` del request. Una Store ajena responde 404.
 
 `User.TenantId` nulo identifica personal de plataforma. Un Owner siempre nace ligado al tenant creado.
 
@@ -201,7 +223,7 @@ Crear, activar, suspender y reactivar asociados, y mutar el catálogo global, ex
 
 Cada request recibe o genera un `X-Correlation-ID`. Se propaga a logs y a `audit_events`.
 
-Se registran creación de tenant, franchisee, store, owner, subscription, activación, suspensión, reactivación y cambio de plan; y mutaciones de Catalog (categoría, producto global, enable/disable de StoreProduct). Los snapshots JSONB no incluyen contraseñas.
+Se registran creación de tenant, franchisee, store, owner, subscription, activación, suspensión, reactivación y cambio de plan; mutaciones de Catalog; cambios de Pricing; e Inventory (`InventoryInitialized`, `InventoryAdjusted`, `InventoryWasteRecorded`). Los snapshots JSONB no incluyen contraseñas.
 
 `AuditEvent` representa una **mutación empresarial real**, no cada llamada HTTP. Un comando idempotente que pide el estado actual (p. ej. Enable cuando ya está Enabled, Activate cuando ya está Active) responde success sin cambiar `UpdatedAt`, sin `SaveChanges` y sin nuevo evento de auditoría. Serilog puede seguir registrando el request; la auditoría no.
 

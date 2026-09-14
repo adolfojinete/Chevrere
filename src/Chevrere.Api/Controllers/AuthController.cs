@@ -1,5 +1,6 @@
 using Chevrere.Api.Http;
 using Chevrere.Infrastructure.Persistence;
+using Chevrere.SharedKernel.Persistence;
 using Chevrere.Modules.Identity.Application.Contracts;
 using Chevrere.SharedKernel.Application;
 using Chevrere.SharedKernel.Results;

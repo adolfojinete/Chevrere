@@ -1,5 +1,4 @@
 using Chevrere.SharedKernel.Persistence;
-using Chevrere.SharedKernel.Results;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -36,15 +35,4 @@ public sealed class EfUnitOfWork(ChevrereDbContext dbContext) : IUnitOfWork
 
         return false;
     }
-}
-
-public sealed class ConcurrencyConflictException : Exception
-{
-    public ConcurrencyConflictException()
-        : base("The resource was modified by another request.")
-    {
-    }
-
-    public static Error ToError() =>
-        Error.Concurrency(ErrorCodes.Concurrency, "The resource was modified by another request.");
 }
