@@ -261,9 +261,15 @@ public sealed class CancelOrderHandler(
 
         try
         {
-            if (!order.Cancel(request.Reason, clock.UtcNow))
+            if (order.Status == OrderStatus.Cancelled)
             {
                 return Result.Success(OrderMapping.ToConsumerDto(order));
+            }
+
+            if (order.Status is OrderStatus.Confirmed or OrderStatus.Expired)
+            {
+                return Result.Failure<ConsumerOrderDto>(
+                    Error.Conflict("order.cannot_cancel", "An order in a terminal state cannot be cancelled."));
             }
 
             await reservations.ReleaseAsync(
@@ -275,6 +281,11 @@ public sealed class CancelOrderHandler(
                     InventoryReferenceTypes.OrderItem,
                     [.. order.Items.Select(i => i.Id)]),
                 cancellationToken);
+
+            if (!order.Cancel(request.Reason, clock.UtcNow))
+            {
+                return Result.Success(OrderMapping.ToConsumerDto(order));
+            }
 
             audit.Record(
                 AuditActions.OrderCancelled,
@@ -309,6 +320,10 @@ public sealed class CancelOrderHandler(
 
             return Result.Success(OrderMapping.ToConsumerDto(order));
         }
+        catch (DomainException ex) when (InventoryReservationErrors.IsIntegrityFailure(ex.Code))
+        {
+            return Result.Failure<ConsumerOrderDto>(Error.Failure(ex.Code, ex.Message));
+        }
         catch (DomainException ex)
         {
             return Result.Failure<ConsumerOrderDto>(Error.Conflict(ex.Code, ex.Message));
@@ -338,7 +353,7 @@ public sealed class ExpireOrderHandler(
 
         try
         {
-            if (!order.Expire(clock.UtcNow))
+            if (order.Status != OrderStatus.PendingPayment)
             {
                 return Result.Success();
             }
@@ -352,6 +367,11 @@ public sealed class ExpireOrderHandler(
                     InventoryReferenceTypes.OrderItem,
                     [.. order.Items.Select(i => i.Id)]),
                 cancellationToken);
+
+            if (!order.Expire(clock.UtcNow))
+            {
+                return Result.Success();
+            }
 
             audit.Record(
                 AuditActions.OrderExpired,
@@ -372,9 +392,13 @@ public sealed class ExpireOrderHandler(
 
             return Result.Success();
         }
-        catch (DomainException)
+        catch (DomainException ex) when (ex.Code == "order.cannot_expire")
         {
             return Result.Success();
+        }
+        catch (DomainException ex)
+        {
+            return Result.Failure(Error.Failure(ex.Code, ex.Message));
         }
     }
 

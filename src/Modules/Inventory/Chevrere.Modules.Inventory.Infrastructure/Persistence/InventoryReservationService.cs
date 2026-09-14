@@ -36,7 +36,7 @@ public sealed class InventoryReservationService(IInventoryStore store, IClock cl
         if (request.Lines.DistinctBy(l => l.ReferenceId).Count() != request.Lines.Count)
         {
             throw new DomainException(
-                "inventory.reservation.reference.duplicate",
+                InventoryReservationErrors.ReferenceDuplicate,
                 "A reservation request cannot contain the same reference twice.");
         }
 
@@ -140,32 +140,43 @@ public sealed class InventoryReservationService(IInventoryStore store, IClock cl
         }
     }
 
+    /// <summary>
+    /// Two-phase completion: validate the exact reservation set, every InventoryItem and every
+    /// status first; only then transition, update balances and post ledger movements.
+    /// Already Released (on release) or already Committed (on commit) lines are retry no-ops
+    /// and do not post a second movement. Any missing reference, missing item, identity mismatch
+    /// or incompatible status fails the whole batch with zero mutations. Does not call SaveChanges.
+    /// </summary>
     private async Task CompleteAsync(
         InventoryReservationReleaseRequest request,
         bool commit,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(request.ReferenceIds);
         if (request.ReferenceIds.Count == 0)
         {
             return;
         }
 
-        var utcNow = clock.UtcNow;
+        var requested = UniqueReferenceIds(request.ReferenceIds);
         var reservations = await store.GetReservationsByReferencesAsync(
             request.TenantId,
             request.StoreId,
             request.ReferenceType,
             request.ReferenceIds,
             cancellationToken);
+        EnsureExactReservationSet(requested, reservations);
 
         var items = await store.GetItemsByProductsAsync(
             request.TenantId,
             request.StoreId,
             [.. reservations.Select(r => r.GlobalProductId).Distinct()],
             cancellationToken);
-        var itemsById = items.ToDictionary(i => i.Id);
+        var itemsById = EnsureInventoryItems(reservations, items);
+        EnsureCompatibleStates(reservations, commit);
 
+        var utcNow = clock.UtcNow;
         foreach (var reservation in reservations.OrderBy(r => r.GlobalProductId).ThenBy(r => r.Id))
         {
             var changed = commit ? reservation.Commit(utcNow) : reservation.Release(utcNow);
@@ -174,19 +185,90 @@ public sealed class InventoryReservationService(IInventoryStore store, IClock cl
                 continue;
             }
 
-            if (!itemsById.TryGetValue(reservation.InventoryItemId, out var item))
-            {
-                throw new DomainException(
-                    "inventory.not_initialized",
-                    "The reserved inventory item is missing.");
-            }
-
+            var item = itemsById[reservation.InventoryItemId];
             var movement = commit
                 ? item.CommitReservation(
                     reservation.Quantity, reservation.Id, request.ActorUserId, request.CorrelationId, utcNow)
                 : item.ReleaseReservation(
                     reservation.Quantity, reservation.Id, request.ActorUserId, request.CorrelationId, utcNow);
             store.AddMovement(movement);
+        }
+    }
+
+    private static HashSet<Guid> UniqueReferenceIds(IReadOnlyList<Guid> referenceIds)
+    {
+        var requested = referenceIds.ToHashSet();
+        if (requested.Count != referenceIds.Count)
+        {
+            throw new DomainException(
+                InventoryReservationErrors.ReferenceDuplicate,
+                "A reservation request cannot contain the same reference twice.");
+        }
+
+        return requested;
+    }
+
+    private static void EnsureExactReservationSet(
+        HashSet<Guid> requested,
+        IReadOnlyList<InventoryReservation> reservations)
+    {
+        var loaded = reservations.Select(r => r.ReferenceId).ToHashSet();
+        if (loaded.Count != reservations.Count || !requested.SetEquals(loaded))
+        {
+            throw new DomainException(
+                InventoryReservationErrors.IncompleteSet,
+                "The reservation set is incomplete or does not match the requested references.");
+        }
+    }
+
+    private static Dictionary<Guid, InventoryItem> EnsureInventoryItems(
+        IReadOnlyList<InventoryReservation> reservations,
+        IReadOnlyList<InventoryItem> items)
+    {
+        if (items.Select(i => i.Id).Distinct().Count() != items.Count)
+        {
+            throw new DomainException(
+                InventoryReservationErrors.IntegrityError,
+                "The loaded inventory item set is inconsistent.");
+        }
+
+        var itemsById = items.ToDictionary(i => i.Id);
+        foreach (var reservation in reservations)
+        {
+            if (!itemsById.TryGetValue(reservation.InventoryItemId, out var item))
+            {
+                throw new DomainException(
+                    InventoryReservationErrors.IntegrityError,
+                    "The reserved inventory item is missing.");
+            }
+
+            if (item.TenantId != reservation.TenantId
+                || item.StoreId != reservation.StoreId
+                || item.GlobalProductId != reservation.GlobalProductId)
+            {
+                throw new DomainException(
+                    InventoryReservationErrors.IntegrityError,
+                    "The reservation does not match its inventory item.");
+            }
+        }
+
+        return itemsById;
+    }
+
+    private static void EnsureCompatibleStates(IReadOnlyList<InventoryReservation> reservations, bool commit)
+    {
+        var incompatible = commit
+            ? reservations.Select(r => r.Status).Any(status =>
+                status is not (InventoryReservationStatus.Active or InventoryReservationStatus.Committed))
+            : reservations.Select(r => r.Status).Any(status =>
+                status is not (InventoryReservationStatus.Active or InventoryReservationStatus.Released));
+        if (incompatible)
+        {
+            throw new DomainException(
+                InventoryReservationErrors.InvalidState,
+                commit
+                    ? "A released reservation cannot be committed as part of this batch."
+                    : "A committed reservation cannot be released as part of this batch.");
         }
     }
 

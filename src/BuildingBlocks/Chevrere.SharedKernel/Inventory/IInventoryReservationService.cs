@@ -10,10 +10,19 @@ public interface IInventoryReservationService
         InventoryReservationRequest request,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Releases the exact requested reference set. Validates input, reservation completeness,
+    /// inventory items and compatible states before the first mutation. Already Released lines
+    /// are idempotent no-ops and do not post a second movement. Does not call SaveChanges.
+    /// </summary>
     Task ReleaseAsync(
         InventoryReservationReleaseRequest request,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Commits the exact requested reference set with the same validate-then-mutate rules as
+    /// <see cref="ReleaseAsync"/>. Already Committed lines are idempotent no-ops. Does not call SaveChanges.
+    /// </summary>
     Task CommitAsync(
         InventoryReservationReleaseRequest request,
         CancellationToken cancellationToken);

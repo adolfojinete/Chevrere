@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Chevrere.Modules.Catalog.Application.Contracts;
 using Chevrere.Modules.Identity.Application.Abstractions;
 using Chevrere.Modules.Orders.Application.Contracts;
 using Chevrere.Modules.Tenancy.Application.Contracts;
@@ -34,6 +35,30 @@ internal static class OrdersTestData
         using var owner = await ConsumerTestData.OwnerClientAsync(factory, $"owner-{suffix.ToLowerInvariant()}@example.com");
         await ConsumerTestData.StockAndPriceAsync(owner, store.StoreId, product.Id, stock, $"ord-{suffix}-init01");
         return (store, product.Id, latitude, longitude);
+    }
+
+    public static async Task<(CreateFranchiseeResponse Store, IReadOnlyList<Guid> ProductIds, double Latitude, double Longitude)> SeedThreeProductStoreAsync(
+        ChevrereApiFactory factory,
+        HttpClient admin,
+        string suffix,
+        string identification,
+        double latitude,
+        double longitude)
+    {
+        var seed = await SeedBuyableStoreAsync(factory, admin, suffix, identification, latitude, longitude, stock: 10);
+        var categoryId = (await admin.GetFromJsonAsync<GlobalProductDto>(
+            $"/api/v1/admin/products/{seed.ProductId}", AuthHelper.Json))!.CategoryId;
+        var second = await CatalogAdminTests.CreateProductAsync(
+            admin, categoryId, $"SKU-{suffix}-B", $"Producto {suffix}B", null);
+        var third = await CatalogAdminTests.CreateProductAsync(
+            admin, categoryId, $"SKU-{suffix}-C", $"Producto {suffix}C", null);
+        await ConsumerTestData.SetGlobalPriceAsync(admin, second.Id, 5000m);
+        await ConsumerTestData.SetGlobalPriceAsync(admin, third.Id, 4000m);
+        using var owner = await ConsumerTestData.OwnerClientAsync(
+            factory, $"owner-{suffix.ToLowerInvariant()}@example.com");
+        await ConsumerTestData.StockAndPriceAsync(owner, seed.Store.StoreId, second.Id, 10, $"ord-{suffix}-b-01");
+        await ConsumerTestData.StockAndPriceAsync(owner, seed.Store.StoreId, third.Id, 10, $"ord-{suffix}-c-01");
+        return (seed.Store, [seed.ProductId, second.Id, third.Id], latitude, longitude);
     }
 
     public static async Task<(Guid UserId, HttpClient Client)> CreateConsumerAsync(

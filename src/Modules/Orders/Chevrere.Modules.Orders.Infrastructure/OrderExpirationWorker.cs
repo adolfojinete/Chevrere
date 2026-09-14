@@ -73,7 +73,15 @@ public sealed class OrderExpirationWorker(
             var handler = scope.ServiceProvider.GetRequiredService<IHandler<ExpireOrderCommand, Result>>();
             try
             {
-                await handler.HandleAsync(new ExpireOrderCommand(orderId), cancellationToken);
+                var result = await handler.HandleAsync(new ExpireOrderCommand(orderId), cancellationToken);
+                if (result.IsFailure)
+                {
+                    logger.LogError(
+                        "Failed to expire order {OrderId}: {ErrorCode} {ErrorMessage}",
+                        orderId,
+                        result.Error!.Code,
+                        result.Error.Message);
+                }
             }
             catch (Exception ex) when (ex is DuplicateKeyException or ConcurrencyConflictException)
             {

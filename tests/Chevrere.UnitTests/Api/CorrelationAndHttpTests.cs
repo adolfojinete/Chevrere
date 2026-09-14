@@ -86,6 +86,9 @@ public sealed class CorrelationAndHttpTests
         Assert.IsType<ObjectResult>(controller.ToProblem(Error.Forbidden("f", "x")));
         Assert.IsType<ObjectResult>(controller.FromConcurrency());
 
+        var integrity = Assert.IsType<ObjectResult>(controller.ToProblem(Error.Failure("inventory.reservation.incomplete_set", "x")));
+        Assert.Equal(StatusCodes.Status500InternalServerError, integrity.StatusCode);
+
         var created = controller.ToCreatedResult(Result.Success(1), "Get", new { id = 1 });
         Assert.IsType<CreatedAtActionResult>(created);
         Assert.IsType<ObjectResult>(controller.ToCreatedResult(Result.Failure<int>(Error.Conflict("c", "x")), "Get", new { id = 1 }));
