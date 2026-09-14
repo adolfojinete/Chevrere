@@ -1,4 +1,4 @@
-using Chevrere.Modules.Pricing.Domain.ValueObjects;
+using Chevrere.SharedKernel.Domain.ValueObjects;
 
 namespace Chevrere.Modules.Pricing.Domain;
 

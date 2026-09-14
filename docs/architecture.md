@@ -48,7 +48,7 @@ Motivo: el compile-time impide que Domain tome dependencias de EF, Identity o HT
 
 `Chevrere.Infrastructure` concentra el `DbContext` único, ASP.NET Identity y auditoría. Un solo contexto permite que el onboarding (`CreateFranchisee`) sea atómico: Tenant + Franchisee + Owner + Store + Subscription se confirman en la misma transacción.
 
-No hay repositorios genéricos. Cada módulo expone puertos de aplicación (`ITenancyStore`, `IIdentityProvisioning`, `ISubscriptionProvisioning`, `ICatalogStore`) implementados en su Infrastructure.
+No hay repositorios genéricos. Cada módulo expone puertos de aplicación (`ITenancyStore`, `IIdentityProvisioning`, `ISubscriptionProvisioning`, `ICatalogStore`, `IProcurementStore`) implementados en su Infrastructure. Cuando un módulo necesita **escribir** en otro, el puerto vive en SharedKernel para que ninguno de los dos referencie al otro: así entra `Procurement` a `Inventory` vía `IInventoryInboundService`.
 
 ## Módulos
 
@@ -60,6 +60,7 @@ No hay repositorios genéricos. Cada módulo expone puertos de aplicación (`ITe
 | Catalog | Catálogo global Chevrere y opt-in comercial por Store |
 | Pricing | Precio sugerido global y override por Store; EffectivePrice |
 | Inventory | Existencia física por Store: balances + ledger inmutable |
+| Procurement | Proveedores, órdenes de compra y recepción de mercancía |
 
 Módulos futuros previstos, no implementados: Orders, Payments, Billing, Operations, Notifications.
 
@@ -76,12 +77,14 @@ StoreProduct (tenant + store)
    ↓
 Pricing (Suggested + Store override → EffectivePrice)
    ↓
+Procurement (Supplier → PurchaseOrder → GoodsReceipt)
+   ↓
 Inventory (OnHand / Reserved / Available + ledger)
    ↓
 Orders   ← futuro
 ```
 
-Las flechas describen composición funcional (qué capa responde qué pregunta), no necesariamente project references. Inventory no referencia Pricing ni Catalog Domain; proyecta SKU/Name vía Infrastructure.
+Las flechas describen composición funcional (qué capa responde qué pregunta), no necesariamente project references. Inventory no referencia Pricing ni Catalog Domain; proyecta SKU/Name vía Infrastructure. Procurement no referencia Inventory: mueve stock por el puerto `IInventoryInboundService` de SharedKernel.
 `Category` y `GlobalProduct` **no** tienen `TenantId`. Son de la plataforma. `StoreProduct` **sí** pertenece a un tenant y referencia `Store (Id, TenantId)` con FK compuesta.
 
 ## Pricing
@@ -112,6 +115,16 @@ StoreProduct Enabled AND EffectivePrice != null AND Inventory.Available > 0
 
 Cada Store gestiona stock por `GlobalProduct` ofrecido (`StoreProduct`). El estado actual vive en `InventoryItem` (`OnHand`, `Reserved`); la historia en `InventoryMovement` inmutable. `Available` se deriva. Mutaciones manuales (Initialize / Adjust / Waste) exigen `Idempotency-Key`. Detalle: [ADR-007](adr/ADR-007-inventory-ledger-and-balances.md).
 
+## Procurement
+
+El stock también entra por la puerta del proveedor: `Supplier` → `PurchaseOrder` (`Draft` → `Approved` → `PartiallyReceived` → `Received`, o `Cancelled`) → `GoodsReceipt` inmutable.
+
+Recibir mercancía escribe en un solo `SaveChanges`: cantidades de la orden, el recibo con sus líneas, el `InventoryMovement` de tipo `Receipt` (referenciando el `GoodsReceiptItem`), la operación idempotente y la auditoría. Si la store aún no gestionaba stock del producto, el ingreso crea el `InventoryItem` en cero; si ya había, se suma.
+
+Los números de documento (`PO-000001`, `GR-000001`) salen de secuencias PostgreSQL. `POST` de orden y de recepción exigen `Idempotency-Key`; el replay responde el snapshot original del recibo aunque la orden haya avanzado después. Detalle: [ADR-008](adr/ADR-008-procurement-purchase-orders-and-goods-receipts.md).
+
+## Catálogo y ciclo de vida
+
 Desactivar una categoría o un producto global no borra `StoreProduct`. Solo deja de ser comercialmente disponible. Una categoría inactiva no desactiva físicamente sus productos.
 
 No hay jerarquía de categorías en esta fase: evita ciclos y no hay caso de uso de árbol. `SortOrder` + nombre alcanzan. Cada presentación (250ml vs 1.5L) es un `GlobalProduct` distinto.
@@ -126,6 +139,7 @@ flowchart TD
     Api --> CatalogInfra[Catalog.Infrastructure]
     Api --> PricingInfra[Pricing.Infrastructure]
     Api --> InventoryInfra[Inventory.Infrastructure]
+    Api --> ProcInfra[Procurement.Infrastructure]
     Api --> SharedInfra[Chevrere.Infrastructure]
 
     IdentityInfra --> IdentityApp[Identity.Application]
@@ -134,6 +148,7 @@ flowchart TD
     CatalogInfra --> CatalogApp[Catalog.Application]
     PricingInfra --> PricingApp[Pricing.Application]
     InventoryInfra --> InventoryApp[Inventory.Application]
+    ProcInfra --> ProcApp[Procurement.Application]
 
     TenancyApp --> IdentityApp
     TenancyApp --> SubsApp
@@ -144,16 +159,21 @@ flowchart TD
     CatalogApp --> CatalogDomain[Catalog.Domain]
     PricingApp --> PricingDomain[Pricing.Domain]
     InventoryApp --> InventoryDomain[Inventory.Domain]
+    ProcApp --> ProcDomain[Procurement.Domain]
+
+    ProcApp --> SharedKernel[SharedKernel]
+    InventoryInfra --> SharedKernel
 
     SharedInfra --> CatalogDomain
     SharedInfra --> PricingDomain
     SharedInfra --> InventoryDomain
+    SharedInfra --> ProcDomain
     SharedInfra --> TenancyDomain
     SharedInfra --> SubsDomain
-    SharedInfra --> SharedKernel[SharedKernel]
+    SharedInfra --> SharedKernel
 ```
 
-Tenancy.Application orquesta el onboarding. Identity y Subscriptions no conocen Tenancy. Pricing e Inventory no dependen de Catalog Application/Domain.
+Tenancy.Application orquesta el onboarding. Identity y Subscriptions no conocen Tenancy. Pricing e Inventory no dependen de Catalog Application/Domain. Procurement.Application solo alcanza Inventory por `Chevrere.SharedKernel.Inventory`; tests de arquitectura lo verifican en ambos sentidos.
 
 ## Multi-tenancy
 
@@ -169,7 +189,7 @@ User autenticado
   → Query filters de EF Core
 ```
 
-Filtros globales en `Tenant`, `Franchisee`, `Store`, `Subscription`, `AuditEvent`, `StoreProduct`, `InventoryItem` e `InventoryMovement`. `Category` y `GlobalProduct` no se filtran por tenant. Los usuarios de plataforma (`PlatformSuperAdmin`, `PlatformAdmin`, `PlatformSupport`) omiten los filtros. Los endpoints `/api/v1/business/*` no aceptan `tenantId` del request. Una Store ajena responde 404.
+Filtros globales en `Tenant`, `Franchisee`, `Store`, `Subscription`, `AuditEvent`, `StoreProduct`, `InventoryItem`, `InventoryMovement`, `Supplier`, `PurchaseOrder` y `GoodsReceipt`. `Category` y `GlobalProduct` no se filtran por tenant. Los usuarios de plataforma (`PlatformSuperAdmin`, `PlatformAdmin`, `PlatformSupport`) omiten los filtros. Los endpoints `/api/v1/business/*` no aceptan `tenantId` del request. Una Store ajena responde 404.
 
 `User.TenantId` nulo identifica personal de plataforma. Un Owner siempre nace ligado al tenant creado.
 
@@ -223,7 +243,7 @@ Crear, activar, suspender y reactivar asociados, y mutar el catálogo global, ex
 
 Cada request recibe o genera un `X-Correlation-ID`. Se propaga a logs y a `audit_events`.
 
-Se registran creación de tenant, franchisee, store, owner, subscription, activación, suspensión, reactivación y cambio de plan; mutaciones de Catalog; cambios de Pricing; e Inventory (`InventoryInitialized`, `InventoryAdjusted`, `InventoryWasteRecorded`). Los snapshots JSONB no incluyen contraseñas.
+Se registran creación de tenant, franchisee, store, owner, subscription, activación, suspensión, reactivación y cambio de plan; mutaciones de Catalog; cambios de Pricing; Inventory (`InventoryInitialized`, `InventoryAdjusted`, `InventoryWasteRecorded`); y Procurement (ciclo de vida de `Supplier` y `PurchaseOrder`, más `GoodsReceiptRecorded`). Los snapshots JSONB no incluyen contraseñas.
 
 `AuditEvent` representa una **mutación empresarial real**, no cada llamada HTTP. Un comando idempotente que pide el estado actual (p. ej. Enable cuando ya está Enabled, Activate cuando ya está Active) responde success sin cambiar `UpdatedAt`, sin `SaveChanges` y sin nuevo evento de auditoría. Serilog puede seguir registrando el request; la auditoría no.
 

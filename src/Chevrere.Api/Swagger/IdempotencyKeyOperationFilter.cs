@@ -7,14 +7,13 @@ public sealed class IdempotencyKeyOperationFilter : IOperationFilter
 {
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
     {
-        var path = context.ApiDescription.RelativePath ?? string.Empty;
-        if (!path.Contains("inventory", StringComparison.OrdinalIgnoreCase))
+        var method = context.ApiDescription.HttpMethod ?? string.Empty;
+        if (!string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
-        var method = context.ApiDescription.HttpMethod ?? string.Empty;
-        if (!string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase))
+        if (!RequiresIdempotencyKey(context.ApiDescription.RelativePath ?? string.Empty))
         {
             return;
         }
@@ -33,4 +32,13 @@ public sealed class IdempotencyKeyOperationFilter : IOperationFilter
             Schema = new OpenApiSchema { Type = "string", MinLength = 8, MaxLength = 128 }
         });
     }
+
+    /// <summary>
+    /// Only quantitative mutations need a key. Purchase order lifecycle transitions (approve, cancel)
+    /// are naturally idempotent, so they are excluded even though their path contains the collection.
+    /// </summary>
+    private static bool RequiresIdempotencyKey(string path) =>
+        path.Contains("inventory", StringComparison.OrdinalIgnoreCase)
+        || path.EndsWith("purchase-orders", StringComparison.OrdinalIgnoreCase)
+        || path.EndsWith("receipts", StringComparison.OrdinalIgnoreCase);
 }

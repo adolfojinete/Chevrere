@@ -1,9 +1,9 @@
 using Chevrere.Modules.Pricing.Application.Abstractions;
 using Chevrere.Modules.Pricing.Application.Contracts;
 using Chevrere.Modules.Pricing.Domain;
-using Chevrere.Modules.Pricing.Domain.ValueObjects;
 using Chevrere.SharedKernel.Application;
 using Chevrere.SharedKernel.Context;
+using Chevrere.SharedKernel.Domain.ValueObjects;
 using Chevrere.SharedKernel.Results;
 
 namespace Chevrere.Modules.Pricing.Application.Queries;

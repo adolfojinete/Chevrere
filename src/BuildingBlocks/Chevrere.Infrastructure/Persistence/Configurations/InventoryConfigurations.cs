@@ -74,6 +74,13 @@ public sealed class InventoryMovementConfiguration : IEntityTypeConfiguration<In
         builder.HasIndex(x => x.TenantId);
         builder.HasIndex(x => x.ReferenceId);
 
+        // A referenced document line may only ever post one movement of a given type. Guarantees a
+        // goods receipt cannot be applied to stock twice, even under concurrent retries.
+        builder.HasIndex(x => new { x.Type, x.ReferenceType, x.ReferenceId })
+            .IsUnique()
+            .HasFilter("reference_id IS NOT NULL")
+            .HasDatabaseName("ix_inventory_movements_reference_unique");
+
         builder.HasOne<InventoryItem>()
             .WithMany()
             .HasForeignKey(x => new { x.InventoryItemId, x.TenantId })

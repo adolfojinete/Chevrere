@@ -1,6 +1,4 @@
-using Chevrere.SharedKernel.Domain;
-
-namespace Chevrere.Modules.Pricing.Domain.ValueObjects;
+namespace Chevrere.SharedKernel.Domain.ValueObjects;
 
 /// <summary>
 /// Supported ISO-4217 currency codes for Chevrere. Expand here as markets grow.
@@ -13,6 +11,10 @@ public static class CurrencyCodes
         string.Equals(currency, Cop, StringComparison.Ordinal);
 }
 
+/// <summary>
+/// Monetary amount shared by every module that handles money (prices, costs).
+/// Always positive, single supported currency, fixed scale of 2.
+/// </summary>
 public sealed class Money : ValueObject
 {
     public const int Scale = 2;
@@ -31,7 +33,7 @@ public sealed class Money : ValueObject
     {
         if (amount <= 0m)
         {
-            throw new DomainException("money.amount.invalid", "Price amount must be greater than zero.");
+            throw new DomainException("money.amount.invalid", "Amount must be greater than zero.");
         }
 
         var code = Guard.NotNullOrWhiteSpace(currency, nameof(currency), 3).ToUpperInvariant();
@@ -45,7 +47,7 @@ public sealed class Money : ValueObject
         {
             throw new DomainException(
                 "money.amount.scale",
-                $"Price amount cannot have more than {Scale} decimal places.");
+                $"Amount cannot have more than {Scale} decimal places.");
         }
 
         return new Money(normalized, code);

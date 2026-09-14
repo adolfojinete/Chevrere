@@ -3,6 +3,7 @@ using Chevrere.Infrastructure.Identity;
 using Chevrere.Modules.Catalog.Domain;
 using Chevrere.Modules.Inventory.Domain;
 using Chevrere.Modules.Pricing.Domain;
+using Chevrere.Modules.Procurement.Domain;
 using Chevrere.Modules.Subscriptions.Domain;
 using Chevrere.Modules.Tenancy.Domain;
 using Chevrere.SharedKernel.Context;
@@ -45,6 +46,16 @@ public sealed class ChevrereDbContext(
 
     public DbSet<InventoryMovement> InventoryMovements => Set<InventoryMovement>();
 
+    public DbSet<Supplier> Suppliers => Set<Supplier>();
+
+    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+
+    public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
+
+    public DbSet<GoodsReceipt> GoodsReceipts => Set<GoodsReceipt>();
+
+    public DbSet<GoodsReceiptItem> GoodsReceiptItems => Set<GoodsReceiptItem>();
+
     public DbSet<IdempotentOperation> IdempotentOperations => Set<IdempotentOperation>();
 
     public bool BypassTenantFilter => tenantFilterBypass.Enabled || currentUser.IsPlatformUser;
@@ -65,6 +76,15 @@ public sealed class ChevrereDbContext(
         builder.Entity<StoreProductPrice>().HasQueryFilter(s => BypassTenantFilter || s.TenantId == FilterTenantId);
         builder.Entity<InventoryItem>().HasQueryFilter(i => BypassTenantFilter || i.TenantId == FilterTenantId);
         builder.Entity<InventoryMovement>().HasQueryFilter(m => BypassTenantFilter || m.TenantId == FilterTenantId);
+        builder.Entity<Supplier>().HasQueryFilter(s => BypassTenantFilter || s.TenantId == FilterTenantId);
+        builder.Entity<PurchaseOrder>().HasQueryFilter(o => BypassTenantFilter || o.TenantId == FilterTenantId);
+        builder.Entity<PurchaseOrderItem>().HasQueryFilter(i => BypassTenantFilter || i.TenantId == FilterTenantId);
+        builder.Entity<GoodsReceipt>().HasQueryFilter(r => BypassTenantFilter || r.TenantId == FilterTenantId);
+        builder.Entity<GoodsReceiptItem>().HasQueryFilter(i => BypassTenantFilter || i.TenantId == FilterTenantId);
+
+        // Document numbers are drawn outside the transaction so retries never reuse a number.
+        builder.HasSequence<long>("procurement_purchase_order_number_seq").StartsAt(1).IncrementsBy(1);
+        builder.HasSequence<long>("procurement_goods_receipt_number_seq").StartsAt(1).IncrementsBy(1);
 
         builder.Entity<ApplicationUser>().ToTable("users");
         builder.Entity<ApplicationRole>().ToTable("roles");
