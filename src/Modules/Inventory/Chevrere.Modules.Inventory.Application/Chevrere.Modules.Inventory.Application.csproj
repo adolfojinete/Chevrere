@@ -6,4 +6,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Chevrere.Modules.Inventory.Domain\Chevrere.Modules.Inventory.Domain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Chevrere.IntegrationTests" />
+  </ItemGroup>
 </Project>

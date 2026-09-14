@@ -2,12 +2,18 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Chevrere.Infrastructure.Audit;
 using Chevrere.Infrastructure.Persistence;
+using Chevrere.Modules.Inventory.Application.Abstractions;
 using Chevrere.Modules.Inventory.Application.Contracts;
+using Chevrere.Modules.Inventory.Application.Idempotency;
+using Chevrere.Modules.Inventory.Domain;
 using Chevrere.Modules.Tenancy.Application.Contracts;
 using Chevrere.SharedKernel.Audit;
 using Chevrere.SharedKernel.Context;
 using Chevrere.SharedKernel.Idempotency;
+using Chevrere.SharedKernel.Persistence;
+using Chevrere.SharedKernel.Time;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -296,33 +302,151 @@ public sealed class InventoryConcurrencyTests(ChevrereApiFactory factory)
     }
 
     [Fact]
-    public async Task Failed_same_key_attempt_does_not_leave_pending_tracker_entries()
+    public async Task Loser_same_key_recovery_cleans_same_dbcontext_without_global_detach()
     {
-        var ctx = await SeedInitializedAsync("CCLEK", 10);
-        using var owner = await OwnerClientAsync(ctx.Email);
-        const string key = "leak-check-key1";
-        var body = new AdjustInventoryRequest(InventoryAdjustmentType.Increase, 5, "Conteo físico");
+        var ctx = await SeedInitializedAsync("CCTR", 10);
+        const string key = "same-key-tracker1";
+        const string reason = "Conteo físico";
+        var hash = IdempotencyFingerprint.Sha256(
+            IdempotencyOperations.InventoryAdjust,
+            ctx.StoreId.ToString("D"),
+            ctx.ProductId.ToString("D"),
+            InventoryAdjustmentType.Increase.ToString(),
+            IdempotencyFingerprint.Format(5),
+            reason);
 
-        using var ownerA = await OwnerClientAsync(ctx.Email);
-        using var ownerB = await OwnerClientAsync(ctx.Email);
-        (await Task.WhenAll(
-            PostMutationAsync(ownerA, AdjustUrl(ctx), body, key),
-            PostMutationAsync(ownerB, AdjustUrl(ctx), body, key))).ToList().ForEach(r => r.EnsureSuccessStatusCode());
+        Guid winnerMovementId;
+        await using (var winnerScope = factory.Services.CreateAsyncScope())
+        {
+            winnerScope.ServiceProvider.GetRequiredService<ITenantFilterBypass>().Enabled = true;
+            var store = winnerScope.ServiceProvider.GetRequiredService<IInventoryStore>();
+            var idempotency = winnerScope.ServiceProvider.GetRequiredService<IIdempotencyStore>();
+            var audit = winnerScope.ServiceProvider.GetRequiredService<IAuditRecorder>();
+            var uow = winnerScope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var clock = winnerScope.ServiceProvider.GetRequiredService<IClock>();
 
-        await using var scope = factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<ChevrereDbContext>();
+            var item = await store.GetItemAsync(ctx.StoreId, ctx.ProductId, CancellationToken.None);
+            Assert.NotNull(item);
+            var movement = item.Increase(5, reason, ctx.OwnerUserId, Guid.CreateVersion7().ToString("D"), clock.UtcNow);
+            store.AddMovement(movement);
+            idempotency.Add(new IdempotentOperation
+            {
+                Id = Guid.CreateVersion7(),
+                TenantId = ctx.TenantId,
+                Operation = IdempotencyOperations.InventoryAdjust,
+                IdempotencyKey = key,
+                RequestHash = hash,
+                ResourceId = movement.Id,
+                CreatedAt = clock.UtcNow
+            });
+            audit.Record(
+                AuditActions.InventoryAdjusted,
+                nameof(InventoryMovement),
+                movement.Id,
+                ctx.TenantId,
+                previousValue: new { OnHand = 10 },
+                newValue: new { movement.OnHandAfter, Delta = movement.OnHandDelta, Reason = movement.Reason });
+            await uow.SaveChangesAsync();
+            winnerMovementId = movement.Id;
+        }
+
+        await using var loserScope = factory.Services.CreateAsyncScope();
+        loserScope.ServiceProvider.GetRequiredService<ITenantFilterBypass>().Enabled = true;
+        var loserDb = loserScope.ServiceProvider.GetRequiredService<ChevrereDbContext>();
+        var loserStore = loserScope.ServiceProvider.GetRequiredService<IInventoryStore>();
+        var loserIdempotency = loserScope.ServiceProvider.GetRequiredService<IIdempotencyStore>();
+        var loserAudit = loserScope.ServiceProvider.GetRequiredService<IAuditRecorder>();
+        var loserUow = loserScope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var loserClock = loserScope.ServiceProvider.GetRequiredService<IClock>();
+
+        var keptCategory = await loserDb.Categories.SingleAsync(c => c.Name.StartsWith("Bebidas CCTR"));
+        keptCategory.Update("Bebidas CCTR Kept", null, 3, loserClock.UtcNow);
+        Assert.Equal(EntityState.Modified, loserDb.Entry(keptCategory).State);
+
+        var loserItem = await loserStore.GetItemAsync(ctx.StoreId, ctx.ProductId, CancellationToken.None);
+        Assert.NotNull(loserItem);
+        var loserMovement = loserItem.Increase(
+            5, reason, ctx.OwnerUserId, Guid.CreateVersion7().ToString("D"), loserClock.UtcNow);
+        loserStore.AddMovement(loserMovement);
+        var loserOp = new IdempotentOperation
+        {
+            Id = Guid.CreateVersion7(),
+            TenantId = ctx.TenantId,
+            Operation = IdempotencyOperations.InventoryAdjust,
+            IdempotencyKey = key,
+            RequestHash = hash,
+            ResourceId = loserMovement.Id,
+            CreatedAt = loserClock.UtcNow
+        };
+        loserIdempotency.Add(loserOp);
+        loserAudit.Record(
+            AuditActions.InventoryAdjusted,
+            nameof(InventoryMovement),
+            loserMovement.Id,
+            ctx.TenantId,
+            previousValue: new { OnHand = 10 },
+            newValue: new { loserMovement.OnHandAfter, Delta = loserMovement.OnHandDelta, Reason = loserMovement.Reason });
+
+        Assert.Equal(EntityState.Modified, loserDb.Entry(loserItem).State);
+        Assert.Equal(EntityState.Added, loserDb.Entry(loserMovement).State);
+        Assert.Equal(EntityState.Added, loserDb.Entry(loserOp).State);
+        Assert.Equal(1, loserDb.ChangeTracker.Entries<AuditEvent>().Count(e => e.State == EntityState.Added));
+
+        await Assert.ThrowsAsync<DuplicateKeyException>(() => loserUow.SaveChangesAsync());
+
+        Assert.Equal(EntityState.Modified, loserDb.Entry(loserItem).State);
+        Assert.Equal(EntityState.Added, loserDb.Entry(loserMovement).State);
+        Assert.Equal(EntityState.Added, loserDb.Entry(loserOp).State);
+        Assert.Equal(1, loserDb.ChangeTracker.Entries<AuditEvent>().Count(e => e.State == EntityState.Added));
+        Assert.Equal(EntityState.Modified, loserDb.Entry(keptCategory).State);
+
+        var attempt = new InventoryMutationAttempt(
+            loserItem,
+            loserMovement,
+            loserOp,
+            AuditActions.InventoryAdjusted,
+            nameof(InventoryMovement),
+            loserMovement.Id);
+        var replay = await InventoryIdempotencyReplay.TryReplayAfterWriteConflictAsync(
+            loserStore,
+            loserIdempotency,
+            loserAudit,
+            attempt,
+            ctx.TenantId,
+            IdempotencyOperations.InventoryAdjust,
+            key,
+            hash,
+            initializeQuantity: null,
+            CancellationToken.None);
+
+        Assert.NotNull(replay);
+        Assert.True(replay.IsSuccess);
+        Assert.Equal(15, replay.Value!.OnHand);
+        Assert.Equal(winnerMovementId, replay.Value.MovementId);
+
+        Assert.Equal(EntityState.Detached, loserDb.Entry(loserItem).State);
+        Assert.Equal(EntityState.Detached, loserDb.Entry(loserMovement).State);
+        Assert.Equal(EntityState.Detached, loserDb.Entry(loserOp).State);
+        Assert.Equal(0, loserDb.ChangeTracker.Entries<AuditEvent>().Count(e => e.State == EntityState.Added));
+        Assert.Equal(EntityState.Modified, loserDb.Entry(keptCategory).State);
         Assert.DoesNotContain(
-            db.ChangeTracker.Entries(),
-            e => e.State is EntityState.Added or EntityState.Modified);
+            loserDb.ChangeTracker.Entries(),
+            e => e.State is EntityState.Added or EntityState.Deleted
+                 || (e.State == EntityState.Modified
+                     && e.Entity is InventoryItem or InventoryMovement or IdempotentOperation or AuditEvent));
 
-        (await PostMutationAsync(
-            owner,
-            AdjustUrl(ctx),
-            new AdjustInventoryRequest(InventoryAdjustmentType.Increase, 1, "Siguiente"),
-            "leak-follow-up1")).EnsureSuccessStatusCode();
+        await loserUow.SaveChangesAsync();
 
-        Assert.Equal(16, await GetOnHandAsync(ctx.StoreId, ctx.ProductId));
-        Assert.Equal(2, await CountMovementsOfTypeAsync(ctx.StoreId, ctx.ProductId, "AdjustmentIncrease"));
+        Assert.Equal("Bebidas CCTR Kept", await loserDb.Categories
+            .Where(c => c.Id == keptCategory.Id)
+            .Select(c => c.Name)
+            .SingleAsync());
+        Assert.Equal(15, await GetOnHandAsync(ctx.StoreId, ctx.ProductId));
+        Assert.Equal(1, await CountMovementsOfTypeAsync(ctx.StoreId, ctx.ProductId, "AdjustmentIncrease"));
+        Assert.Equal(1, await CountAuditsAsync(AuditActions.InventoryAdjusted, ctx.TenantId));
+        Assert.Equal(1, await CountIdempotencyAsync(ctx.TenantId, IdempotencyOperations.InventoryAdjust, key));
+        Assert.Equal(0, await CountAuditsForEntityAsync(AuditActions.InventoryAdjusted, loserMovement.Id));
+        Assert.Equal(1, await CountItemsAsync(ctx.StoreId, ctx.ProductId));
     }
 
     private async Task<SeedContext> SeedInitializedAsync(string suffix, long quantity)
@@ -349,7 +473,7 @@ public sealed class InventoryConcurrencyTests(ChevrereApiFactory factory)
         (await owner.PostAsync(
             $"/api/v1/business/stores/{franchisee.StoreId}/products/{product.Id}/enable", null))
             .EnsureSuccessStatusCode();
-        return new SeedContext(franchisee.TenantId, franchisee.StoreId, product.Id, email);
+        return new SeedContext(franchisee.TenantId, franchisee.StoreId, product.Id, franchisee.OwnerUserId, email);
     }
 
     private static string IdentificationFor(string suffix) =>
@@ -435,8 +559,16 @@ public sealed class InventoryConcurrencyTests(ChevrereApiFactory factory)
         await using var scope = factory.Services.CreateAsyncScope();
         scope.ServiceProvider.GetRequiredService<ITenantFilterBypass>().Enabled = true;
         var db = scope.ServiceProvider.GetRequiredService<ChevrereDbContext>();
-        return await db.Set<Chevrere.Infrastructure.Audit.AuditEvent>()
+        return await db.Set<AuditEvent>()
             .CountAsync(e => e.Action == action && e.TenantId == tenantId);
+    }
+
+    private async Task<int> CountAuditsForEntityAsync(string action, Guid entityId)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<ITenantFilterBypass>().Enabled = true;
+        var db = scope.ServiceProvider.GetRequiredService<ChevrereDbContext>();
+        return await db.Set<AuditEvent>().CountAsync(e => e.Action == action && e.EntityId == entityId);
     }
 
     private async Task<int> CountIdempotencyAsync(Guid tenantId, string operation, string key)
@@ -448,5 +580,5 @@ public sealed class InventoryConcurrencyTests(ChevrereApiFactory factory)
             .CountAsync(o => o.TenantId == tenantId && o.Operation == operation && o.IdempotencyKey == key);
     }
 
-    private sealed record SeedContext(Guid TenantId, Guid StoreId, Guid ProductId, string Email);
+    private sealed record SeedContext(Guid TenantId, Guid StoreId, Guid ProductId, Guid OwnerUserId, string Email);
 }
