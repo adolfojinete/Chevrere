@@ -48,7 +48,7 @@ Editar un draft **reutiliza** la línea de un producto que sigue en la orden en 
 Inventory expone un puerto en SharedKernel, no un tipo propio:
 
 ```csharp
-namespace Chevrere.SharedKernel.Inventory;
+namespace YaaJuu.SharedKernel.Inventory;
 
 public interface IInventoryInboundService
 {

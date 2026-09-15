@@ -1,9 +1,0 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Chevrere.Modules.Identity.Domain\Chevrere.Modules.Identity.Domain.csproj" />
-  </ItemGroup>
-</Project>

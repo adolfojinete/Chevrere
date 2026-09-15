@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BuildingBlocks\YaaJuu.Infrastructure\YaaJuu.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Identity\YaaJuu.Modules.Identity.Infrastructure\YaaJuu.Modules.Identity.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Subscriptions\YaaJuu.Modules.Subscriptions.Infrastructure\YaaJuu.Modules.Subscriptions.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Tenancy\YaaJuu.Modules.Tenancy.Infrastructure\YaaJuu.Modules.Tenancy.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Catalog\YaaJuu.Modules.Catalog.Infrastructure\YaaJuu.Modules.Catalog.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Pricing\YaaJuu.Modules.Pricing.Infrastructure\YaaJuu.Modules.Pricing.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Inventory\YaaJuu.Modules.Inventory.Infrastructure\YaaJuu.Modules.Inventory.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Procurement\YaaJuu.Modules.Procurement.Infrastructure\YaaJuu.Modules.Procurement.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Consumer\YaaJuu.Modules.Consumer.Infrastructure\YaaJuu.Modules.Consumer.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Orders\YaaJuu.Modules.Orders.Infrastructure\YaaJuu.Modules.Orders.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

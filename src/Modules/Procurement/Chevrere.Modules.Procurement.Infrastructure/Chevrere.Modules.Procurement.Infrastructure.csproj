@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="..\Chevrere.Modules.Procurement.Application\Chevrere.Modules.Procurement.Application.csproj" />
-    <ProjectReference Include="..\..\..\BuildingBlocks\Chevrere.Infrastructure\Chevrere.Infrastructure.csproj" />
-  </ItemGroup>
-</Project>

@@ -1,0 +1,11 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\YaaJuu.Modules.Tenancy.Domain\YaaJuu.Modules.Tenancy.Domain.csproj" />
+    <ProjectReference Include="..\..\Identity\YaaJuu.Modules.Identity.Application\YaaJuu.Modules.Identity.Application.csproj" />
+    <ProjectReference Include="..\..\Subscriptions\YaaJuu.Modules.Subscriptions.Application\YaaJuu.Modules.Subscriptions.Application.csproj" />
+  </ItemGroup>
+</Project>

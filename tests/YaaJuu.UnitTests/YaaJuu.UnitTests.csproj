@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BuildingBlocks\YaaJuu.Infrastructure\YaaJuu.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\BuildingBlocks\YaaJuu.SharedKernel\YaaJuu.SharedKernel.csproj" />
+    <ProjectReference Include="..\..\src\YaaJuu.Api\YaaJuu.Api.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Identity\YaaJuu.Modules.Identity.Application\YaaJuu.Modules.Identity.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Identity\YaaJuu.Modules.Identity.Domain\YaaJuu.Modules.Identity.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Identity\YaaJuu.Modules.Identity.Infrastructure\YaaJuu.Modules.Identity.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Subscriptions\YaaJuu.Modules.Subscriptions.Application\YaaJuu.Modules.Subscriptions.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Subscriptions\YaaJuu.Modules.Subscriptions.Domain\YaaJuu.Modules.Subscriptions.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Tenancy\YaaJuu.Modules.Tenancy.Application\YaaJuu.Modules.Tenancy.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Tenancy\YaaJuu.Modules.Tenancy.Domain\YaaJuu.Modules.Tenancy.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Catalog\YaaJuu.Modules.Catalog.Domain\YaaJuu.Modules.Catalog.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Catalog\YaaJuu.Modules.Catalog.Application\YaaJuu.Modules.Catalog.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Consumer\YaaJuu.Modules.Consumer.Domain\YaaJuu.Modules.Consumer.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Consumer\YaaJuu.Modules.Consumer.Application\YaaJuu.Modules.Consumer.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Pricing\YaaJuu.Modules.Pricing.Domain\YaaJuu.Modules.Pricing.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Inventory\YaaJuu.Modules.Inventory.Domain\YaaJuu.Modules.Inventory.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Inventory\YaaJuu.Modules.Inventory.Application\YaaJuu.Modules.Inventory.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Inventory\YaaJuu.Modules.Inventory.Infrastructure\YaaJuu.Modules.Inventory.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Orders\YaaJuu.Modules.Orders.Domain\YaaJuu.Modules.Orders.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Orders\YaaJuu.Modules.Orders.Application\YaaJuu.Modules.Orders.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Procurement\YaaJuu.Modules.Procurement.Domain\YaaJuu.Modules.Procurement.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Procurement\YaaJuu.Modules.Procurement.Application\YaaJuu.Modules.Procurement.Application.csproj" />
+  </ItemGroup>
+</Project>

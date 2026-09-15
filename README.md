@@ -1,8 +1,10 @@
-# Chevrere
+# YaaJuu
+
+YaaJuu es la marca oficial vigente del producto.
 
 Plataforma SaaS + quick-commerce sobre una red de dark stores independientes.
 
-Esta fase entrega la fundación técnica, la administración central de asociados, el catálogo comercial, pricing, inventario, abastecimiento, discovery hacia el consumidor y pedidos: onboarding atómico de Tenant, Franchisee, Owner, primera Store, Plan y Subscription; ciclo de vida (activar, suspender, reactivar) sin borrar datos; catálogo global Chevrere y habilitación por dark store; precio sugerido global y override por Store; ledger de inventario por dark store; proveedores, órdenes de compra y recepción de mercancía; cobertura geolocalizada (PostGIS) y catálogo comercial anónimo; carrito y pedidos con reserva de stock; auditoría; multi-tenancy; y autenticación de plataforma.
+Esta fase entrega la fundación técnica, la administración central de asociados, el catálogo comercial, pricing, inventario, abastecimiento, discovery hacia el consumidor y pedidos: onboarding atómico de Tenant, Franchisee, Owner, primera Store, Plan y Subscription; ciclo de vida (activar, suspender, reactivar) sin borrar datos; catálogo global YaaJuu y habilitación por dark store; precio sugerido global y override por Store; ledger de inventario por dark store; proveedores, órdenes de compra y recepción de mercancía; cobertura geolocalizada (PostGIS) y catálogo comercial anónimo; carrito y pedidos con reserva de stock; auditoría; multi-tenancy; y autenticación de plataforma.
 
 ## Objetivo
 
@@ -13,12 +15,12 @@ Funcionalidad mínima, arquitectura seria. Un solo backend desplegable. Módulos
 Monolito modular en .NET 10 / ASP.NET Core.
 
 ```text
-Chevrere
+YaaJuu
 ├── src
-│   ├── Chevrere.Api
+│   ├── YaaJuu.Api
 │   ├── BuildingBlocks
-│   │   ├── Chevrere.SharedKernel
-│   │   └── Chevrere.Infrastructure
+│   │   ├── YaaJuu.SharedKernel
+│   │   └── YaaJuu.Infrastructure
 │   └── Modules
 │       ├── Identity     (Domain / Application / Infrastructure)
 │       ├── Tenancy      (Domain / Application / Infrastructure)
@@ -30,9 +32,9 @@ Chevrere
 │       ├── Consumer     (Domain / Application / Infrastructure)
 │       └── Orders       (Domain / Application / Infrastructure)
 ├── tests
-│   ├── Chevrere.UnitTests
-│   ├── Chevrere.IntegrationTests
-│   └── Chevrere.ArchitectureTests
+│   ├── YaaJuu.UnitTests
+│   ├── YaaJuu.IntegrationTests
+│   └── YaaJuu.ArchitectureTests
 ├── deploy/docker-compose.yml
 └── docs
 ```
@@ -48,11 +50,12 @@ Detalle: [docs/architecture.md](docs/architecture.md).
 ## PostgreSQL local (PostGIS)
 
 ```powershell
-cd C:\Users\adolf\source\repos\Chevrere\deploy
+cd deploy
 docker compose up -d
 ```
 
 La imagen es PostGIS (`postgis/postgis:17-3.5-alpine`), no Postgres plano: Consumer Discovery resuelve cobertura con `geography(Point,4326)`.
+Los nombres físicos locales de Postgres (base, usuario, volume `chevrere_pgdata` y variables `CHEVRERE_DB_*`) se mantienen a propósito para no romper entornos existentes. No coinciden con la marca.
 Valores de desarrollo (no son credenciales de producción):
 
 - Host: `localhost`
@@ -84,9 +87,9 @@ En Development hay una `Jwt:SigningKey` de placeholder. Cámbiala. En cualquier 
 No hay contraseña de SuperAdmin en el repositorio. El seeder solo crea el usuario si existe password.
 
 ```powershell
-cd C:\Users\adolf\source\repos\Chevrere\src\Chevrere.Api
+cd src\YaaJuu.Api
 dotnet user-secrets init
-dotnet user-secrets set "Bootstrap:SuperAdmin:Email" "admin@chevrere.local"
+dotnet user-secrets set "Bootstrap:SuperAdmin:Email" "admin@yaajuu.local"
 dotnet user-secrets set "Bootstrap:SuperAdmin:Password" "<elige-una-password-fuerte>"
 dotnet user-secrets set "Jwt:SigningKey" "<llave-de-al-menos-32-caracteres>"
 ```
@@ -96,7 +99,7 @@ La password debe cumplir Identity: mínimo 10 caracteres, mayúscula, minúscula
 Variables de entorno alternativas:
 
 ```text
-Bootstrap__SuperAdmin__Email=admin@chevrere.local
+Bootstrap__SuperAdmin__Email=admin@yaajuu.local
 Bootstrap__SuperAdmin__Password=...
 Jwt__SigningKey=...
 ```
@@ -104,27 +107,25 @@ Jwt__SigningKey=...
 ## Migraciones
 
 ```powershell
-cd C:\Users\adolf\source\repos\Chevrere
-dotnet ef migrations add InitialCreate --project src\BuildingBlocks\Chevrere.Infrastructure --startup-project src\Chevrere.Api --output-dir Persistence/Migrations
-dotnet ef database update --project src\BuildingBlocks\Chevrere.Infrastructure --startup-project src\Chevrere.Api
+dotnet ef migrations add InitialCreate --project src\BuildingBlocks\YaaJuu.Infrastructure --startup-project src\YaaJuu.Api --output-dir Persistence/Migrations
+dotnet ef database update --project src\BuildingBlocks\YaaJuu.Infrastructure --startup-project src\YaaJuu.Api
 ```
 
 La API aplica las migraciones pendientes al arrancar, en cualquier ambiente. No se usa `EnsureCreated()`. También puedes aplicarlas a mano:
 
 ```powershell
-dotnet ef database update --project src\BuildingBlocks\Chevrere.Infrastructure --startup-project src\Chevrere.Api
+dotnet ef database update --project src\BuildingBlocks\YaaJuu.Infrastructure --startup-project src\YaaJuu.Api
 ```
 
 ## Ejecución
 
 ```powershell
-cd C:\Users\adolf\source\repos\Chevrere
 dotnet restore
 dotnet build
 cd deploy
 docker compose up -d
 cd ..
-dotnet run --project src\Chevrere.Api
+dotnet run --project src\YaaJuu.Api
 ```
 
 - API HTTP: `http://localhost:5088`
@@ -176,7 +177,7 @@ Quedan fuera de cobertura (no bajan el porcentaje):
 
 - migraciones EF (`**/Migrations/**`)
 - composition root (`Program.cs`)
-- factory de diseño de EF (`ChevrereDbContextFactory`)
+- factory de diseño de EF (`YaaJuuDbContextFactory`)
 
 Eso se configura en `tests/coverlet.runsettings` y con `[ExcludeFromCodeCoverage]`. Sonar usa las mismas exclusiones en `sonar-project.properties`.
 

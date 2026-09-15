@@ -6,13 +6,13 @@ Aceptado — Fase 3.
 
 ## Contexto
 
-Chevrere administra un catálogo global compartido. Cada dark store opera de forma independiente y necesita autonomía comercial sobre el precio de venta, sin perder la orientación de marca de la plataforma.
+YaaJuu administra un catálogo global compartido. Cada dark store opera de forma independiente y necesita autonomía comercial sobre el precio de venta, sin perder la orientación de marca de la plataforma.
 
 ## Decisión
 
 Se crea el módulo `Pricing` (Domain / Application / Infrastructure) separado de Catalog.
 
-- `GlobalProductPrice`: precio sugerido vigente de Chevrere por `GlobalProduct` (sin `TenantId`).
+- `GlobalProductPrice`: precio sugerido vigente de YaaJuu por `GlobalProduct` (sin `TenantId`).
 - `StoreProductPrice`: override vigente por `(Store, GlobalProduct)` (tenant-scoped).
 - Modelo temporal versionado: `ValidFrom` / `ValidTo`; vigente cuando `ValidTo IS NULL`.
 - Un cambio de precio cierra la versión anterior y abre una nueva en la misma transacción.

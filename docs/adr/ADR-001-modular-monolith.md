@@ -6,7 +6,7 @@ Aceptado
 
 ## Contexto
 
-Chevrere necesita una base de producto real, no una PoC. Aún no existen equipos múltiples, tráfico de consumidores ni bounded contexts operativos que justifiquen distribución.
+YaaJuu necesita una base de producto real, no una PoC. Aún no existen equipos múltiples, tráfico de consumidores ni bounded contexts operativos que justifiquen distribución.
 
 ## Decisión
 

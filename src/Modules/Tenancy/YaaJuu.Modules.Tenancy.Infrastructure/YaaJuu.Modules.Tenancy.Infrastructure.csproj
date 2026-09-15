@@ -1,0 +1,6 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\YaaJuu.Modules.Tenancy.Application\YaaJuu.Modules.Tenancy.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\YaaJuu.Infrastructure\YaaJuu.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

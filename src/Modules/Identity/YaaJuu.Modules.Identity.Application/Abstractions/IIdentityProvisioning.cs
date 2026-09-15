@@ -1,0 +1,17 @@
+using YaaJuu.Modules.Identity.Application.Contracts;
+using YaaJuu.SharedKernel.Results;
+
+namespace YaaJuu.Modules.Identity.Application.Abstractions;
+
+public interface IIdentityProvisioning
+{
+    Task<Result<OwnerUserResult>> AddOwnerAsync(OwnerUserRequest request, CancellationToken cancellationToken);
+
+    Task<Result<ConsumerUserResult>> AddConsumerAsync(
+        string email,
+        string password,
+        string displayName,
+        CancellationToken cancellationToken);
+
+    Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken);
+}
