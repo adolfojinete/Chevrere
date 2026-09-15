@@ -51,6 +51,18 @@ public sealed class Plan : AggregateRoot
         };
     }
 
+    public void Rename(string name, DateTimeOffset utcNow)
+    {
+        var next = Guard.NotNullOrWhiteSpace(name, nameof(name), 120);
+        if (Name == next)
+        {
+            return;
+        }
+
+        Name = next;
+        UpdatedAt = utcNow;
+    }
+
     public void Deactivate(DateTimeOffset utcNow)
     {
         IsActive = false;

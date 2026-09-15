@@ -48,11 +48,7 @@ public sealed class DatabaseSeeder(
             }
 
             var result = await roleManager.CreateAsync(new ApplicationRole(roleName));
-            if (!result.Succeeded)
-            {
-                throw new InvalidOperationException(
-                    $"Unable to seed role {roleName}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
-            }
+            EnsureSucceeded(result, $"Unable to seed role {roleName}");
         }
 
         _ = cancellationToken;
@@ -62,37 +58,45 @@ public sealed class DatabaseSeeder(
     {
         var options = planSeedOptions.Value;
         var code = options.Code.Trim().ToUpperInvariant();
-        if (await dbContext.Plans.AnyAsync(p => p.Code == code, cancellationToken))
+        var existing = await dbContext.Plans.SingleOrDefaultAsync(p => p.Code == code, cancellationToken);
+        if (existing is null)
         {
+            var plan = Plan.Create(
+                code,
+                options.Name,
+                options.Description,
+                Money.Create(options.MonthlyPrice, options.Currency),
+                BillingPeriod.Monthly,
+                clock.UtcNow);
+
+            dbContext.Plans.Add(plan);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("Seeded plan {PlanCode}", code);
             return;
         }
 
-        var plan = Plan.Create(
-            code,
-            options.Name,
-            options.Description,
-            Money.Create(options.MonthlyPrice, options.Currency),
-            BillingPeriod.Monthly,
-            clock.UtcNow);
-
-        dbContext.Plans.Add(plan);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Seeded plan {PlanCode}", code);
+        if (!string.Equals(existing.Name, options.Name.Trim(), StringComparison.Ordinal))
+        {
+            existing.Rename(options.Name, clock.UtcNow);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("Updated seeded plan {PlanCode} display name", code);
+        }
     }
 
     private async Task SeedSuperAdminAsync(CancellationToken cancellationToken)
     {
         var options = bootstrapOptions.Value.SuperAdmin;
+        var existing = await FindBootstrapSuperAdminAsync(options.Email);
+        if (existing is not null)
+        {
+            await AlignBootstrapSuperAdminAsync(existing, options);
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(options.Password))
         {
             logger.LogWarning(
                 "Bootstrap SuperAdmin password is not configured. Set Bootstrap__SuperAdmin__Password or User Secrets.");
-            return;
-        }
-
-        var existing = await userManager.FindByEmailAsync(options.Email);
-        if (existing is not null)
-        {
             return;
         }
 
@@ -111,21 +115,71 @@ public sealed class DatabaseSeeder(
             UpdatedAt = now
         };
 
-        var create = await userManager.CreateAsync(user, options.Password);
-        if (!create.Succeeded)
-        {
-            throw new InvalidOperationException(
-                $"Unable to seed SuperAdmin: {string.Join(", ", create.Errors.Select(e => e.Description))}");
-        }
-
-        var role = await userManager.AddToRoleAsync(user, RoleNames.PlatformSuperAdmin);
-        if (!role.Succeeded)
-        {
-            throw new InvalidOperationException(
-                $"Unable to assign SuperAdmin role: {string.Join(", ", role.Errors.Select(e => e.Description))}");
-        }
+        EnsureSucceeded(await userManager.CreateAsync(user, options.Password), "Unable to seed SuperAdmin");
+        EnsureSucceeded(
+            await userManager.AddToRoleAsync(user, RoleNames.PlatformSuperAdmin),
+            "Unable to assign SuperAdmin role");
 
         logger.LogInformation("Seeded platform SuperAdmin {Email}", options.Email);
         _ = cancellationToken;
+    }
+
+    private async Task<ApplicationUser?> FindBootstrapSuperAdminAsync(string configuredEmail)
+    {
+        var byEmail = await userManager.FindByEmailAsync(configuredEmail);
+        if (byEmail is not null)
+        {
+            return byEmail;
+        }
+
+        var superAdmins = await userManager.GetUsersInRoleAsync(RoleNames.PlatformSuperAdmin);
+        return superAdmins
+            .Where(user => user.TenantId is null)
+            .OrderBy(user => user.CreatedAt)
+            .ThenBy(user => user.Id)
+            .FirstOrDefault();
+    }
+
+    private async Task AlignBootstrapSuperAdminAsync(ApplicationUser user, SuperAdminBootstrapOptions options)
+    {
+        var email = options.Email.Trim();
+        var displayName = options.DisplayName.Trim();
+        var changed = false;
+
+        if (!string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase))
+        {
+            EnsureSucceeded(await userManager.SetEmailAsync(user, email), "Unable to update SuperAdmin email");
+            changed = true;
+        }
+
+        if (!string.Equals(user.UserName, email, StringComparison.OrdinalIgnoreCase))
+        {
+            EnsureSucceeded(await userManager.SetUserNameAsync(user, email), "Unable to update SuperAdmin user name");
+            changed = true;
+        }
+
+        if (!string.Equals(user.DisplayName, displayName, StringComparison.Ordinal))
+        {
+            user.DisplayName = displayName;
+            changed = true;
+        }
+
+        if (!changed)
+        {
+            return;
+        }
+
+        user.UpdatedAt = clock.UtcNow;
+        EnsureSucceeded(await userManager.UpdateAsync(user), "Unable to update SuperAdmin");
+        logger.LogInformation("Aligned bootstrap SuperAdmin {UserId} to {Email}", user.Id, email);
+    }
+
+    private static void EnsureSucceeded(IdentityResult result, string action)
+    {
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"{action}: {string.Join(", ", result.Errors.Select(error => error.Description))}");
+        }
     }
 }

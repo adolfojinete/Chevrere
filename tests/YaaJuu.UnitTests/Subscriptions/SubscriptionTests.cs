@@ -7,6 +7,25 @@ namespace YaaJuu.UnitTests.Subscriptions;
 public sealed class SubscriptionTests
 {
     [Fact]
+    public void Rename_updates_display_name_without_changing_plan_identity()
+    {
+        var plan = TestEntities.Plan();
+        var id = plan.Id;
+
+        plan.Rename("Chevrere Standard", FixedClock.Now);
+
+        Assert.Equal(id, plan.Id);
+        Assert.Equal("STANDARD", plan.Code);
+        Assert.Equal("Chevrere Standard", plan.Name);
+
+        plan.Rename("YaaJuu Standard", FixedClock.Now.AddMinutes(1));
+
+        Assert.Equal(id, plan.Id);
+        Assert.Equal("STANDARD", plan.Code);
+        Assert.Equal("YaaJuu Standard", plan.Name);
+    }
+
+    [Fact]
     public void Start_trial_sets_period_from_trial_days()
     {
         var plan = TestEntities.Plan();
