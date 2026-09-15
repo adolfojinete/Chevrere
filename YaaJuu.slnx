@@ -22,6 +22,11 @@
     <Project Path="src/Modules/Orders/YaaJuu.Modules.Orders.Domain/YaaJuu.Modules.Orders.Domain.csproj" />
     <Project Path="src/Modules/Orders/YaaJuu.Modules.Orders.Infrastructure/YaaJuu.Modules.Orders.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Payments/">
+    <Project Path="src/Modules/Payments/YaaJuu.Modules.Payments.Application/YaaJuu.Modules.Payments.Application.csproj" />
+    <Project Path="src/Modules/Payments/YaaJuu.Modules.Payments.Domain/YaaJuu.Modules.Payments.Domain.csproj" />
+    <Project Path="src/Modules/Payments/YaaJuu.Modules.Payments.Infrastructure/YaaJuu.Modules.Payments.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Pricing/">
     <Project Path="src/Modules/Pricing/YaaJuu.Modules.Pricing.Application/YaaJuu.Modules.Pricing.Application.csproj" />
     <Project Path="src/Modules/Pricing/YaaJuu.Modules.Pricing.Domain/YaaJuu.Modules.Pricing.Domain.csproj" />

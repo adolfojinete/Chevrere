@@ -65,8 +65,9 @@ No hay repositorios genéricos. Cada módulo expone puertos de aplicación (`ITe
 | Procurement | Proveedores, órdenes de compra y recepción de mercancía |
 | Consumer | Discovery geolocalizado: área de servicio, cobertura y catálogo comercial anónimo |
 | Orders | Carrito del consumidor, pedidos con snapshot comercial y reserva de inventario |
+| Payments | Cobro multi-comercio Wompi por Tenant; Payment/Attempt; webhook + reconciliación |
 
-Módulos futuros previstos, no implementados: Payments, Billing, Operations, Notifications.
+Módulos futuros previstos, no implementados: Billing, Operations/Fulfillment, Notifications.
 
 ## Catálogo
 
@@ -140,6 +141,24 @@ Los DTOs de consumidor no incluyen store/tenant ids, stock, distancia ni coorden
 ## Orders
 
 El consumidor autenticado (`RoleNames.Consumer`, JWT sin `TenantId`) arma un carrito contra la store que `IConsumerStoreResolver` elige por lat/lon. El puerto vive en `YaaJuu.SharedKernel.Discovery` para que Orders y Consumer compartan la misma decisión; `GeoCoordinate` sigue en Consumer.Domain. Crear el pedido convierte el carrito, congela precio y ficha, y reserva `Available` vía `IInventoryReservationService`. `Confirm` no mueve `OnHand`. TTL 15 minutos; el worker de expiración se apaga en Testing.
+
+## Payments
+
+```text
+Order PendingPayment + Reservation Active
+        ↓
+Payment (Tenant merchant Wompi)
+        ↓
+PaymentAttempt durable → Wompi
+        ↓
+Webhook / Reconciliation (evidencia autenticada)
+        ↓
+Payment Approved → Order Confirmed
+        ↓
+Reservation STILL Active (Fulfillment futuro hace Commit)
+```
+
+Credenciales Wompi por Tenant (no por Store). Secretos cifrados AES-GCM con master key externa (`YAAJUU_PAYMENT_SECRETS_KEY`). YaaJuu no es receptor central del dinero.
 
 DTOs `/api/v1/consumer/cart|orders` no incluyen store, tenant, coords, reservas ni inventario. Business lista por store propia (404 si es ajena). Admin lee. Detalle: [ADR-010](adr/ADR-010-orders-cart-and-inventory-reservations.md).
 

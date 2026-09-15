@@ -1,6 +1,8 @@
 using YaaJuu.Modules.Orders.Application;
 using YaaJuu.Modules.Orders.Application.Abstractions;
+using YaaJuu.Modules.Orders.Infrastructure.Payments;
 using YaaJuu.Modules.Orders.Infrastructure.Persistence;
+using YaaJuu.SharedKernel.Payments;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -26,6 +28,7 @@ public static class OrdersInfrastructureExtensions
         services.AddScoped<IOrderNumberGenerator, OrderNumberGenerator>();
         services.AddScoped<IOrderCommercialReadStore, OrderCommercialReadStore>();
         services.AddSingleton<IOrderReservationPolicy, ConfiguredOrderReservationPolicy>();
+        services.AddScoped<IOrderPaymentLifecycle, OrderPaymentLifecycle>();
         services.AddHostedService<OrderExpirationWorker>();
         return services;
     }

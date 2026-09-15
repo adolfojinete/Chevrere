@@ -46,4 +46,13 @@ public static class AuditActions
     public const string OrderCreated = "order.created";
     public const string OrderCancelled = "order.cancelled";
     public const string OrderExpired = "order.expired";
+    public const string OrderConfirmed = "order.confirmed";
+    public const string PaymentCreated = "payment.created";
+    public const string PaymentAttemptCreated = "payment.attempt.created";
+    public const string PaymentApproved = "payment.approved";
+    public const string PaymentReconciliationRequired = "payment.reconciliation_required";
+    public const string MerchantConfigurationCreated = "payment.merchant.created";
+    public const string MerchantConfigurationUpdated = "payment.merchant.updated";
+    public const string MerchantConfigurationEnabled = "payment.merchant.enabled";
+    public const string MerchantConfigurationDisabled = "payment.merchant.disabled";
 }

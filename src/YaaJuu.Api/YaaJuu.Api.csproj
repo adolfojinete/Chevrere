@@ -21,5 +21,6 @@
     <ProjectReference Include="..\Modules\Procurement\YaaJuu.Modules.Procurement.Infrastructure\YaaJuu.Modules.Procurement.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Consumer\YaaJuu.Modules.Consumer.Infrastructure\YaaJuu.Modules.Consumer.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\Orders\YaaJuu.Modules.Orders.Infrastructure\YaaJuu.Modules.Orders.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\Payments\YaaJuu.Modules.Payments.Infrastructure\YaaJuu.Modules.Payments.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

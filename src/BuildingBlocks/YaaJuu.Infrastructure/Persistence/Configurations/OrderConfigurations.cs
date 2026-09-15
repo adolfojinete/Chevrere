@@ -100,6 +100,8 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.HasKey(x => x.Id);
         builder.HasAlternateKey(x => new { x.Id, x.TenantId });
+        builder.HasAlternateKey(x => new { x.Id, x.TenantId, x.StoreId })
+            .HasName("ak_orders_id_tenant_store");
 
         builder.Property(x => x.Number).HasMaxLength(40).IsRequired();
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();

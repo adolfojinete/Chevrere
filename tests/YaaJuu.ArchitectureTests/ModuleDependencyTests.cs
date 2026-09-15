@@ -43,6 +43,7 @@ public sealed class ModuleDependencyTests
             typeof(InventoryItem).Assembly,
             typeof(PurchaseOrder).Assembly,
             typeof(YaaJuu.Modules.Orders.Domain.Order).Assembly,
+            typeof(YaaJuu.Modules.Payments.Domain.Payment).Assembly,
             typeof(StoreServiceArea).Assembly,
             typeof(Entity).Assembly
         };
@@ -71,7 +72,9 @@ public sealed class ModuleDependencyTests
                     "YaaJuu.Modules.Consumer.Application",
                     "YaaJuu.Modules.Consumer.Infrastructure",
                     "YaaJuu.Modules.Orders.Application",
-                    "YaaJuu.Modules.Orders.Infrastructure")
+                    "YaaJuu.Modules.Orders.Infrastructure",
+                    "YaaJuu.Modules.Payments.Application",
+                    "YaaJuu.Modules.Payments.Infrastructure")
                 .GetResult();
 
             Assert.True(result.IsSuccessful, Format(result));
@@ -91,7 +94,8 @@ public sealed class ModuleDependencyTests
             typeof(InventoryApplicationExtensions).Assembly,
             typeof(ProcurementApplicationExtensions).Assembly,
             typeof(ConsumerApplicationExtensions).Assembly,
-            typeof(YaaJuu.Modules.Orders.Application.OrdersApplicationExtensions).Assembly
+            typeof(YaaJuu.Modules.Orders.Application.OrdersApplicationExtensions).Assembly,
+            typeof(YaaJuu.Modules.Payments.Application.PaymentsApplicationExtensions).Assembly
         };
 
         foreach (var assembly in assemblies)
@@ -109,7 +113,8 @@ public sealed class ModuleDependencyTests
                     "YaaJuu.Modules.Inventory.Infrastructure",
                     "YaaJuu.Modules.Procurement.Infrastructure",
                     "YaaJuu.Modules.Consumer.Infrastructure",
-                    "YaaJuu.Modules.Orders.Infrastructure")
+                    "YaaJuu.Modules.Orders.Infrastructure",
+                    "YaaJuu.Modules.Payments.Infrastructure")
                 .GetResult();
 
             Assert.True(result.IsSuccessful, Format(result));
@@ -519,16 +524,74 @@ public sealed class ModuleDependencyTests
             typeof(ConsumerInfrastructureExtensions).Assembly.GetName().Name,
             typeof(YaaJuu.Modules.Orders.Domain.Order).Assembly.GetName().Name,
             typeof(YaaJuu.Modules.Orders.Application.OrdersApplicationExtensions).Assembly.GetName().Name,
-            typeof(YaaJuu.Modules.Orders.Infrastructure.OrdersInfrastructureExtensions).Assembly.GetName().Name
+            typeof(YaaJuu.Modules.Orders.Infrastructure.OrdersInfrastructureExtensions).Assembly.GetName().Name,
+            typeof(YaaJuu.Modules.Payments.Domain.Payment).Assembly.GetName().Name,
+            typeof(YaaJuu.Modules.Payments.Application.PaymentsApplicationExtensions).Assembly.GetName().Name,
+            typeof(YaaJuu.Modules.Payments.Infrastructure.PaymentsInfrastructureExtensions).Assembly.GetName().Name
         };
 
-        Assert.Equal(27, names.Length);
+        Assert.Equal(30, names.Length);
         Assert.All(names, name =>
         {
             Assert.False(string.IsNullOrWhiteSpace(name));
             Assert.StartsWith("YaaJuu.Modules.", name, StringComparison.Ordinal);
         });
-        Assert.Equal(27, names.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(30, names.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    [Fact]
+    public void Payments_domain_does_not_depend_on_orders_inventory_or_wompi_infrastructure()
+    {
+        var result = Types.InAssembly(typeof(YaaJuu.Modules.Payments.Domain.Payment).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "YaaJuu.Modules.Orders.Domain",
+                "YaaJuu.Modules.Orders.Application",
+                "YaaJuu.Modules.Orders.Infrastructure",
+                "YaaJuu.Modules.Inventory.Domain",
+                "YaaJuu.Modules.Inventory.Application",
+                "YaaJuu.Modules.Inventory.Infrastructure",
+                "YaaJuu.Modules.Consumer.Domain",
+                "YaaJuu.Modules.Catalog.Domain",
+                "YaaJuu.Modules.Pricing.Domain",
+                "YaaJuu.Modules.Payments.Infrastructure",
+                "YaaJuu.Modules.Payments.Application")
+            .GetResult();
+        Assert.True(result.IsSuccessful, Format(result));
+    }
+
+    [Fact]
+    public void Payments_application_does_not_depend_on_concrete_wompi_adapter()
+    {
+        var result = Types.InAssembly(typeof(YaaJuu.Modules.Payments.Application.PaymentsApplicationExtensions).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "YaaJuu.Modules.Payments.Infrastructure",
+                "YaaJuu.Modules.Orders.Domain",
+                "YaaJuu.Modules.Inventory.Domain")
+            .GetResult();
+        Assert.True(result.IsSuccessful, Format(result));
+    }
+
+    [Fact]
+    public void Orders_and_inventory_do_not_depend_on_payments_domain()
+    {
+        var orders = Types.InAssembly(typeof(YaaJuu.Modules.Orders.Domain.Order).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "YaaJuu.Modules.Payments.Domain",
+                "YaaJuu.Modules.Payments.Application",
+                "YaaJuu.Modules.Payments.Infrastructure")
+            .GetResult();
+        var inventory = Types.InAssembly(typeof(InventoryItem).Assembly)
+            .ShouldNot()
+            .HaveDependencyOnAny(
+                "YaaJuu.Modules.Payments.Domain",
+                "YaaJuu.Modules.Payments.Application",
+                "YaaJuu.Modules.Payments.Infrastructure")
+            .GetResult();
+        Assert.True(orders.IsSuccessful, Format(orders));
+        Assert.True(inventory.IsSuccessful, Format(inventory));
     }
 
     private static string Format(TestResult result) =>

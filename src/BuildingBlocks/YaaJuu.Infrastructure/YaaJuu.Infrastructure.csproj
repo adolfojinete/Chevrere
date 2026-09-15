@@ -29,6 +29,7 @@
     <ProjectReference Include="..\..\Modules\Pricing\YaaJuu.Modules.Pricing.Domain\YaaJuu.Modules.Pricing.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Inventory\YaaJuu.Modules.Inventory.Domain\YaaJuu.Modules.Inventory.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Orders\YaaJuu.Modules.Orders.Domain\YaaJuu.Modules.Orders.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Payments\YaaJuu.Modules.Payments.Domain\YaaJuu.Modules.Payments.Domain.csproj" />
     <ProjectReference Include="..\..\Modules\Procurement\YaaJuu.Modules.Procurement.Domain\YaaJuu.Modules.Procurement.Domain.csproj" />
   </ItemGroup>
 </Project>
