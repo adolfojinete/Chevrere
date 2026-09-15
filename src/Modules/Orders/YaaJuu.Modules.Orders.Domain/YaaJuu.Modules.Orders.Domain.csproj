@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\YaaJuu.SharedKernel\YaaJuu.SharedKernel.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="YaaJuu.Modules.Orders.Infrastructure" />
+    <InternalsVisibleTo Include="YaaJuu.UnitTests" />
+    <InternalsVisibleTo Include="YaaJuu.IntegrationTests" />
+  </ItemGroup>
+</Project>

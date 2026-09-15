@@ -6,7 +6,7 @@ Aceptado — Fase 6.
 
 ## Contexto
 
-Hasta la Fase 5 el back-office sabe quién opera cada dark store, qué vende, a qué precio y cuánto stock tiene. El consumidor aún no puede preguntar “¿me entregan aquí?” ni “¿qué puedo comprar?” sin revelar la red de operadores detrás de la marca única Chevrere.
+Hasta la Fase 5 el back-office sabe quién opera cada dark store, qué vende, a qué precio y cuánto stock tiene. El consumidor aún no puede preguntar “¿me entregan aquí?” ni “¿qué puedo comprar?” sin revelar la red de operadores detrás de la marca única YaaJuu.
 
 Consumer Discovery responde esas dos preguntas sin filtrar identidad de store, tenant, coordenadas operativas ni stock.
 

@@ -1,20 +1,22 @@
-# Arquitectura de Chevrere
+# Arquitectura de YaaJuu
 
 ## Contexto
 
-Chevrere es una plataforma SaaS + quick-commerce basada en una red de dark stores independientes.
+YaaJuu es la marca oficial vigente del producto.
+
+YaaJuu es una plataforma SaaS + quick-commerce basada en una red de dark stores independientes.
 
 Hacia el consumidor existe una sola marca y una sola aplicación. Internamente, múltiples operadores/asociados operan una o varias dark stores. El backend es único. Esta fase cubre la administración central de asociados, el catálogo comercial (global + por store), abastecimiento e inventario, y el discovery geolocalizado hacia el consumidor.
 
 ```text
-                       CHEVRERE
+                       YAAJUU
 
         ┌────────────────┼────────────────┐
         │                │                │
         ▼                ▼                ▼
 
  APP CONSUMIDOR    BACK-OFFICE       ADMIN CENTRAL
-    Flutter         ASOCIADO            CHEVRERE
+    Flutter         ASOCIADO            YAAJUU
    (futuro)         (futuro)            (esta fase)
 
         │                │                │
@@ -22,7 +24,7 @@ Hacia el consumidor existe una sola marca y una sola aplicación. Internamente, 
                          │
                          ▼
 
-                  CHEVRERE API
+                  YAAJUU API
                     .NET 10
                 MONOLITO MODULAR
 
@@ -42,11 +44,11 @@ No se usan RabbitMQ, Redis, MongoDB ni microservicios en esta fase.
 
 ## Estructura elegida
 
-Se adoptó la separación física Domain / Application / Infrastructure por módulo, más un `SharedKernel` y un `Chevrere.Infrastructure` compartido.
+Se adoptó la separación física Domain / Application / Infrastructure por módulo, más un `SharedKernel` y un `YaaJuu.Infrastructure` compartido.
 
 Motivo: el compile-time impide que Domain tome dependencias de EF, Identity o HTTP. Un solo proyecto por módulo no habría dado esa garantía.
 
-`Chevrere.Infrastructure` concentra el `DbContext` único, ASP.NET Identity y auditoría. Un solo contexto permite que el onboarding (`CreateFranchisee`) sea atómico: Tenant + Franchisee + Owner + Store + Subscription se confirman en la misma transacción.
+`YaaJuu.Infrastructure` concentra el `DbContext` único, ASP.NET Identity y auditoría. Un solo contexto permite que el onboarding (`CreateFranchisee`) sea atómico: Tenant + Franchisee + Owner + Store + Subscription se confirman en la misma transacción.
 
 No hay repositorios genéricos. Cada módulo expone puertos de aplicación (`ITenancyStore`, `IIdentityProvisioning`, `ISubscriptionProvisioning`, `ICatalogStore`, `IProcurementStore`) implementados en su Infrastructure. Cuando un módulo necesita **escribir** en otro, el puerto vive en SharedKernel para que ninguno de los dos referencie al otro: así entra `Procurement` a `Inventory` vía `IInventoryInboundService`.
 
@@ -57,7 +59,7 @@ No hay repositorios genéricos. Cada módulo expone puertos de aplicación (`ITe
 | Identity | Usuarios, roles, JWT, bootstrap SuperAdmin, provisioning del Owner |
 | Tenancy | Tenant, Franchisee, Store, onboarding y ciclo de vida administrativo |
 | Subscriptions | Planes SaaS y suscripción del tenant. Distinto de pagos del consumidor |
-| Catalog | Catálogo global Chevrere y opt-in comercial por Store |
+| Catalog | Catálogo global YaaJuu y opt-in comercial por Store |
 | Pricing | Precio sugerido global y override por Store; EffectivePrice |
 | Inventory | Existencia física por Store: balances + ledger inmutable |
 | Procurement | Proveedores, órdenes de compra y recepción de mercancía |
@@ -69,7 +71,7 @@ Módulos futuros previstos, no implementados: Payments, Billing, Operations, Not
 ## Catálogo
 
 ```text
-CHEVRERE
+YAAJUU
    ↓
 Category (global)
    ↓
@@ -91,7 +93,7 @@ Las flechas describen composición funcional (qué capa responde qué pregunta),
 
 ## Pricing
 
-Chevrere define un **SuggestedPrice** global por producto. Cada Store puede definir un **override**. El precio que aplica es:
+YaaJuu define un **SuggestedPrice** global por producto. Cada Store puede definir un **override**. El precio que aplica es:
 
 ```text
 EffectivePrice = StoreOverride ?? SuggestedPrice ?? null
@@ -137,7 +139,7 @@ Los DTOs de consumidor no incluyen store/tenant ids, stock, distancia ni coorden
 
 ## Orders
 
-El consumidor autenticado (`RoleNames.Consumer`, JWT sin `TenantId`) arma un carrito contra la store que `IConsumerStoreResolver` elige por lat/lon. El puerto vive en `Chevrere.SharedKernel.Discovery` para que Orders y Consumer compartan la misma decisión; `GeoCoordinate` sigue en Consumer.Domain. Crear el pedido convierte el carrito, congela precio y ficha, y reserva `Available` vía `IInventoryReservationService`. `Confirm` no mueve `OnHand`. TTL 15 minutos; el worker de expiración se apaga en Testing.
+El consumidor autenticado (`RoleNames.Consumer`, JWT sin `TenantId`) arma un carrito contra la store que `IConsumerStoreResolver` elige por lat/lon. El puerto vive en `YaaJuu.SharedKernel.Discovery` para que Orders y Consumer compartan la misma decisión; `GeoCoordinate` sigue en Consumer.Domain. Crear el pedido convierte el carrito, congela precio y ficha, y reserva `Available` vía `IInventoryReservationService`. `Confirm` no mueve `OnHand`. TTL 15 minutos; el worker de expiración se apaga en Testing.
 
 DTOs `/api/v1/consumer/cart|orders` no incluyen store, tenant, coords, reservas ni inventario. Business lista por store propia (404 si es ajena). Admin lee. Detalle: [ADR-010](adr/ADR-010-orders-cart-and-inventory-reservations.md).
 
@@ -151,7 +153,7 @@ No hay jerarquía de categorías en esta fase: evita ciclos y no hay caso de uso
 
 ```mermaid
 flowchart TD
-    Api[Chevrere.Api] --> IdentityInfra[Identity.Infrastructure]
+    Api[YaaJuu.Api] --> IdentityInfra[Identity.Infrastructure]
     Api --> TenancyInfra[Tenancy.Infrastructure]
     Api --> SubsInfra[Subscriptions.Infrastructure]
     Api --> CatalogInfra[Catalog.Infrastructure]
@@ -160,7 +162,7 @@ flowchart TD
     Api --> ProcInfra[Procurement.Infrastructure]
     Api --> ConsumerInfra[Consumer.Infrastructure]
     Api --> OrdersInfra[Orders.Infrastructure]
-    Api --> SharedInfra[Chevrere.Infrastructure]
+    Api --> SharedInfra[YaaJuu.Infrastructure]
 
     IdentityInfra --> IdentityApp[Identity.Application]
     TenancyInfra --> TenancyApp[Tenancy.Application]
@@ -200,7 +202,7 @@ flowchart TD
     SharedInfra --> SharedKernel
 ```
 
-Tenancy.Application orquesta el onboarding. Identity y Subscriptions no conocen Tenancy. Pricing e Inventory no dependen de Catalog Application/Domain. Procurement.Application y Orders.Application solo alcanzan Inventory por puertos de `Chevrere.SharedKernel.Inventory`. Orders.Application resuelve la store por `Chevrere.SharedKernel.Discovery`. Consumer.Domain y Consumer.Application no referencian Catalog, Pricing, Inventory, Orders ni Tenancy.
+Tenancy.Application orquesta el onboarding. Identity y Subscriptions no conocen Tenancy. Pricing e Inventory no dependen de Catalog Application/Domain. Procurement.Application y Orders.Application solo alcanzan Inventory por puertos de `YaaJuu.SharedKernel.Inventory`. Orders.Application resuelve la store por `YaaJuu.SharedKernel.Discovery`. Consumer.Domain y Consumer.Application no referencian Catalog, Pricing, Inventory, Orders ni Tenancy.
 
 ## Multi-tenancy
 
@@ -281,7 +283,7 @@ Se registran creación de tenant, franchisee, store, owner, subscription, activa
 
 PostgreSQL único con extensión **PostGIS** (imagen `postgis/postgis:17-3.5-alpine` en docker-compose y Testcontainers). EF Core + Npgsql + NetTopologySuite. Nombres `snake_case`. Enums como `text`. `timestamp with time zone` vía `DateTimeOffset`. Identificadores UUID v7.
 
-No hay `EnsureCreated()`. Las migraciones viven en `Chevrere.Infrastructure`. La API las aplica al arrancar, antes del seed. También pueden ejecutarse a mano con `dotnet ef database update`. La migración `AddConsumerDiscovery` habilita `CREATE EXTENSION postgis` y crea `store_service_areas` con índice GiST.
+No hay `EnsureCreated()`. Las migraciones viven en `YaaJuu.Infrastructure`. La API las aplica al arrancar, antes del seed. También pueden ejecutarse a mano con `dotnet ef database update`. La migración `AddConsumerDiscovery` habilita `CREATE EXTENSION postgis` y crea `store_service_areas` con índice GiST.
 
 Soft delete: no se usa. El historial empresarial se conserva con `Status`. `AuditEvent` es append-only.
 
@@ -289,7 +291,7 @@ Soft delete: no se usa. El historial empresarial se conserva con `Status`. `Audi
 
 Una sola API, tres superficies:
 
-- `/api/v1/admin/*` — administración Chevrere (incluye configurar/habilitar área de servicio)
+- `/api/v1/admin/*` — administración YaaJuu (incluye configurar/habilitar área de servicio)
 - `/api/v1/business/*` — back-office del asociado (incluye lectura del área de su store)
 - `/api/v1/consumer/*` — discovery anónimo (cobertura, catálogo, categorías, detalle) y cart/orders autenticados (`Consumer`)
 

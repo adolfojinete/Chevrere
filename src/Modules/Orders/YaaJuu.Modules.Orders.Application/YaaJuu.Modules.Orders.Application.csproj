@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\YaaJuu.Modules.Orders.Domain\YaaJuu.Modules.Orders.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="YaaJuu.IntegrationTests" />
+    <InternalsVisibleTo Include="YaaJuu.UnitTests" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,60 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/YaaJuu.Api/YaaJuu.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/YaaJuu.Infrastructure/YaaJuu.Infrastructure.csproj" />
+    <Project Path="src/BuildingBlocks/YaaJuu.SharedKernel/YaaJuu.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/" />
+  <Folder Name="/src/Modules/Catalog/">
+    <Project Path="src/Modules/Catalog/YaaJuu.Modules.Catalog.Application/YaaJuu.Modules.Catalog.Application.csproj" />
+    <Project Path="src/Modules/Catalog/YaaJuu.Modules.Catalog.Domain/YaaJuu.Modules.Catalog.Domain.csproj" />
+    <Project Path="src/Modules/Catalog/YaaJuu.Modules.Catalog.Infrastructure/YaaJuu.Modules.Catalog.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Consumer/">
+    <Project Path="src/Modules/Consumer/YaaJuu.Modules.Consumer.Application/YaaJuu.Modules.Consumer.Application.csproj" />
+    <Project Path="src/Modules/Consumer/YaaJuu.Modules.Consumer.Domain/YaaJuu.Modules.Consumer.Domain.csproj" />
+    <Project Path="src/Modules/Consumer/YaaJuu.Modules.Consumer.Infrastructure/YaaJuu.Modules.Consumer.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Orders/">
+    <Project Path="src/Modules/Orders/YaaJuu.Modules.Orders.Application/YaaJuu.Modules.Orders.Application.csproj" />
+    <Project Path="src/Modules/Orders/YaaJuu.Modules.Orders.Domain/YaaJuu.Modules.Orders.Domain.csproj" />
+    <Project Path="src/Modules/Orders/YaaJuu.Modules.Orders.Infrastructure/YaaJuu.Modules.Orders.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Pricing/">
+    <Project Path="src/Modules/Pricing/YaaJuu.Modules.Pricing.Application/YaaJuu.Modules.Pricing.Application.csproj" />
+    <Project Path="src/Modules/Pricing/YaaJuu.Modules.Pricing.Domain/YaaJuu.Modules.Pricing.Domain.csproj" />
+    <Project Path="src/Modules/Pricing/YaaJuu.Modules.Pricing.Infrastructure/YaaJuu.Modules.Pricing.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Inventory/">
+    <Project Path="src/Modules/Inventory/YaaJuu.Modules.Inventory.Application/YaaJuu.Modules.Inventory.Application.csproj" />
+    <Project Path="src/Modules/Inventory/YaaJuu.Modules.Inventory.Domain/YaaJuu.Modules.Inventory.Domain.csproj" />
+    <Project Path="src/Modules/Inventory/YaaJuu.Modules.Inventory.Infrastructure/YaaJuu.Modules.Inventory.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Procurement/">
+    <Project Path="src/Modules/Procurement/YaaJuu.Modules.Procurement.Application/YaaJuu.Modules.Procurement.Application.csproj" />
+    <Project Path="src/Modules/Procurement/YaaJuu.Modules.Procurement.Domain/YaaJuu.Modules.Procurement.Domain.csproj" />
+    <Project Path="src/Modules/Procurement/YaaJuu.Modules.Procurement.Infrastructure/YaaJuu.Modules.Procurement.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Identity/">
+    <Project Path="src/Modules/Identity/YaaJuu.Modules.Identity.Application/YaaJuu.Modules.Identity.Application.csproj" />
+    <Project Path="src/Modules/Identity/YaaJuu.Modules.Identity.Domain/YaaJuu.Modules.Identity.Domain.csproj" />
+    <Project Path="src/Modules/Identity/YaaJuu.Modules.Identity.Infrastructure/YaaJuu.Modules.Identity.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Subscriptions/">
+    <Project Path="src/Modules/Subscriptions/YaaJuu.Modules.Subscriptions.Application/YaaJuu.Modules.Subscriptions.Application.csproj" />
+    <Project Path="src/Modules/Subscriptions/YaaJuu.Modules.Subscriptions.Domain/YaaJuu.Modules.Subscriptions.Domain.csproj" />
+    <Project Path="src/Modules/Subscriptions/YaaJuu.Modules.Subscriptions.Infrastructure/YaaJuu.Modules.Subscriptions.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Tenancy/">
+    <Project Path="src/Modules/Tenancy/YaaJuu.Modules.Tenancy.Application/YaaJuu.Modules.Tenancy.Application.csproj" />
+    <Project Path="src/Modules/Tenancy/YaaJuu.Modules.Tenancy.Domain/YaaJuu.Modules.Tenancy.Domain.csproj" />
+    <Project Path="src/Modules/Tenancy/YaaJuu.Modules.Tenancy.Infrastructure/YaaJuu.Modules.Tenancy.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/YaaJuu.ArchitectureTests/YaaJuu.ArchitectureTests.csproj" />
+    <Project Path="tests/YaaJuu.IntegrationTests/YaaJuu.IntegrationTests.csproj" />
+    <Project Path="tests/YaaJuu.UnitTests/YaaJuu.UnitTests.csproj" />
+  </Folder>
+</Solution>
