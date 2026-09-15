@@ -52,10 +52,17 @@ Verified:
 
 ### Known limitations / decisions pending
 
-- Cancel while payment in-flight remains allowed (avoids Orders↔Payments circular dependency); late Approved → ReconciliationRequired
+- Cancel while payment in-flight remains allowed (avoids Orders↔Payments circular dependency); late Approved → ReconciliationRequired (`OrderExpiredAfterPayment` / `OrderCancelledAfterPayment`)
 - Provider-side idempotency: unique `reference` + local durable attempt; no official idempotency header used
-- Without `ProviderTransactionId`, recovery after crash depends on webhook (no lookup-by-reference)
+- **No lookup-by-reference**: without `ProviderTransactionId`, crash window leaves Attempt `Unknown`, blocks new charges, and waits for webhook (or later reconciliation once an id exists). Timeout is never treated as Declined.
+- Provider reference uniqueness is enforced locally (`ux_payment_attempts_merchant_reference`) and matches Wompi 422 on duplicate reference.
+- Merchant rotation: historical Attempt keeps `MerchantConfigurationId` V1; new Attempts use active V2; webhook/reconciliation decrypts secrets from the Attempt's configuration.
+- Amount/currency mismatch on authentic Approved webhook: preserve external truth on Attempt/Payment, set `RequiresReconciliation`, do **not** Confirm Order.
 - Automatic refunds, chargebacks, saved cards, PSE/Nequi, master-key rotation UI: future
+
+### Hardening evidence (Phase 8.1)
+
+IntegrationTests on PostgreSQL/Testcontainers cover multi-merchant routing, webhook signature/dedup/concurrency, same/different idempotency keys, Unknown crash window, reconciliation, late approvals, amount/currency mismatch, inventory absolute boundary (no Commit on Approved), secret encryption-at-rest + API redaction, and DB unique/FK constraints.
 
 ## Consequences
 

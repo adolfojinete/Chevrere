@@ -72,7 +72,9 @@ public sealed class InitializePaymentHandler(
             payable.TenantId, IdempotencyOperations.PaymentsInitialize, request.IdempotencyKey, cancellationToken);
 
         var payment = await store.GetByOrderIdAsync(payable.OrderId, cancellationToken);
-        var fingerprint = BuildFingerprint(consumerId, payable, request.Body, payment);
+        // Fingerprint must be stable across create + replay. Do not include Payment.Id:
+        // on first call payment is null; after commit it exists and would break same-key replay.
+        var fingerprint = BuildFingerprint(consumerId, payable, request.Body);
 
         if (existingKey is not null)
         {
@@ -143,6 +145,25 @@ public sealed class InitializePaymentHandler(
             return Result.Success(await MapConsumerAsync(payment, store, secrets, cancellationToken));
         }
 
+        // Reload when retrying after a terminal attempt so xmin matches the row written by
+        // webhook/reconciliation (avoids false DbUpdateConcurrencyException on StartAttempt).
+        if (payment.Attempts.Count > 0)
+        {
+            store.DetachPaymentGraph(payment);
+            payment = await store.GetByOrderIdAsync(payable.OrderId, cancellationToken)
+                      ?? payment;
+            if (payment.GetInFlightAttempt() is not null)
+            {
+                return Result.Failure<ConsumerPaymentDto>(
+                    Error.Conflict("payment.attempt.in_progress", "A payment attempt is already in progress."));
+            }
+
+            if (payment.Status == PaymentStatus.Approved || payment.RequiresReconciliation)
+            {
+                return Result.Success(await MapConsumerAsync(payment, store, secrets, cancellationToken));
+            }
+        }
+
         PaymentAttempt attempt;
         try
         {
@@ -176,39 +197,27 @@ public sealed class InitializePaymentHandler(
         };
         idempotency.Add(idempo);
 
+        if (!isNewPayment)
+        {
+            store.AcceptHistoricalAttemptsUnchanged(payment, attempt);
+        }
+
         try
         {
-            await unitOfWork.SaveChangesAsync(cancellationToken);
+            using (isNewPayment ? null : store.SuspendAutoDetectChanges())
+            {
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+            }
         }
         catch (DuplicateKeyException)
         {
-            idempotency.DiscardPending(idempo);
-            if (isNewPayment)
-            {
-                store.DiscardPendingPayment(payment);
-            }
-
-            var committed = await store.GetByOrderIdAsync(payable.OrderId, cancellationToken);
-            if (committed is null)
-            {
-                return Result.Failure<ConsumerPaymentDto>(Error.Conflict("payment.conflict", "Payment conflict."));
-            }
-
-            var replayKey = await idempotency.FindAsync(
-                payable.TenantId, IdempotencyOperations.PaymentsInitialize, request.IdempotencyKey, cancellationToken);
-            if (replayKey is not null
-                && string.Equals(replayKey.RequestHash, fingerprint, StringComparison.Ordinal))
-            {
-                return Result.Success(await MapConsumerAsync(committed, store, secrets, cancellationToken));
-            }
-
-            if (committed.GetInFlightAttempt() is not null)
-            {
-                return Result.Failure<ConsumerPaymentDto>(
-                    Error.Conflict("payment.attempt.in_progress", "A payment attempt is already in progress."));
-            }
-
-            return Result.Failure<ConsumerPaymentDto>(Error.Conflict("payment.conflict", "Payment conflict."));
+            return await RecoverInitializeConflictAsync(
+                payable, request, fingerprint, payment, attempt, isNewPayment, idempo, cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            return await RecoverInitializeConflictAsync(
+                payable, request, fingerprint, payment, attempt, isNewPayment, idempo, cancellationToken);
         }
 
         // Reload tracked payment after commit
@@ -221,7 +230,16 @@ public sealed class InitializePaymentHandler(
             return Result.Success(await MapConsumerAsync(payment, store, secrets, cancellationToken));
         }
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            var latest = await store.GetByOrderIdAsync(payable.OrderId, cancellationToken)
+                         ?? payment;
+            return Result.Success(await MapConsumerAsync(latest, store, secrets, cancellationToken));
+        }
 
         PaymentProviderMerchantSecrets decrypted;
         try
@@ -292,6 +310,53 @@ public sealed class InitializePaymentHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success(await MapConsumerAsync(payment, store, secrets, cancellationToken));
+    }
+
+    private async Task<Result<ConsumerPaymentDto>> RecoverInitializeConflictAsync(
+        PayableOrderSnapshot payable,
+        InitializePaymentCommand request,
+        string fingerprint,
+        Payment payment,
+        PaymentAttempt attempt,
+        bool isNewPayment,
+        IdempotentOperation idempo,
+        CancellationToken cancellationToken)
+    {
+        idempotency.DiscardPending(idempo);
+        audit.DiscardPending(AuditActions.PaymentAttemptCreated, nameof(PaymentAttempt), attempt.Id);
+        if (isNewPayment)
+        {
+            audit.DiscardPending(AuditActions.PaymentCreated, nameof(Payment), payment.Id);
+            store.DiscardPendingPayment(payment);
+        }
+        else
+        {
+            store.DiscardPendingAttempt(attempt);
+        }
+
+        store.DetachPaymentGraph(payment);
+
+        var committed = await store.GetByOrderIdAsync(payable.OrderId, cancellationToken);
+        if (committed is null)
+        {
+            return Result.Failure<ConsumerPaymentDto>(Error.Conflict("payment.conflict", "Payment conflict."));
+        }
+
+        var replayKey = await idempotency.FindAsync(
+            payable.TenantId, IdempotencyOperations.PaymentsInitialize, request.IdempotencyKey, cancellationToken);
+        if (replayKey is not null
+            && string.Equals(replayKey.RequestHash, fingerprint, StringComparison.Ordinal))
+        {
+            return Result.Success(await MapConsumerAsync(committed, store, secrets, cancellationToken));
+        }
+
+        if (committed.GetInFlightAttempt() is not null)
+        {
+            return Result.Failure<ConsumerPaymentDto>(
+                Error.Conflict("payment.attempt.in_progress", "A payment attempt is already in progress."));
+        }
+
+        return Result.Failure<ConsumerPaymentDto>(Error.Conflict("payment.conflict", "Payment conflict."));
     }
 
     private async Task ApplyChargeResultAsync(
@@ -395,12 +460,10 @@ public sealed class InitializePaymentHandler(
     private static string BuildFingerprint(
         Guid consumerId,
         PayableOrderSnapshot payable,
-        InitializePaymentRequest body,
-        Payment? payment) =>
+        InitializePaymentRequest body) =>
         IdempotencyFingerprint.Sha256(
             consumerId.ToString("D"),
             payable.OrderId.ToString("D"),
-            payment?.Id.ToString("D"),
             IdempotencyFingerprint.Format(payable.TotalAmount),
             payable.Currency,
             body.CardToken is null ? "widget" : "card",

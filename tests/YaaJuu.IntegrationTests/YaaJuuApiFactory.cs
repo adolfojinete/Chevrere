@@ -1,8 +1,11 @@
 using YaaJuu.Infrastructure.Persistence;
+using YaaJuu.SharedKernel.Payments;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Testcontainers.PostgreSql;
 
@@ -17,6 +20,8 @@ public sealed class YaaJuuApiFactory : WebApplicationFactory<Program>, IAsyncLif
         .WithUsername("yaajuu")
         .WithPassword("yaajuu_test_only")
         .Build();
+
+    public FakePaymentProvider FakePayments { get; } = new();
 
     public async Task InitializeAsync() => await _postgres.StartAsync();
 
@@ -44,6 +49,12 @@ public sealed class YaaJuuApiFactory : WebApplicationFactory<Program>, IAsyncLif
         }
 
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(TestSettings()));
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<IPaymentProvider>();
+            services.AddSingleton(FakePayments);
+            services.AddSingleton<IPaymentProvider>(sp => sp.GetRequiredService<FakePaymentProvider>());
+        });
     }
 
     public HttpClient CreateClientUnredirected()
@@ -77,6 +88,14 @@ public sealed class YaaJuuApiFactory : WebApplicationFactory<Program>, IAsyncLif
         ["Orders:ReservationTtlMinutes"] = "15",
         ["Orders:ExpirationPollSeconds"] = "60",
         ["Orders:ExpirationBatchSize"] = "100",
-        ["Orders:ExpirationWorkerEnabled"] = "false"
+        ["Orders:ExpirationWorkerEnabled"] = "false",
+        ["Payments:Enabled"] = "true",
+        ["Payments:SecretsMasterKey"] = Convert.ToBase64String(
+            System.Security.Cryptography.SHA256.HashData("yaajuu-integration-payment-secrets-v1"u8.ToArray())),
+        ["Payments:Wompi:TimeoutSeconds"] = "5",
+        ["Payments:Reconciliation:Enabled"] = "false",
+        ["Payments:Reconciliation:PollIntervalSeconds"] = "30",
+        ["Payments:Reconciliation:BatchSize"] = "50",
+        ["Payments:Reconciliation:MinimumAttemptAgeSeconds"] = "0"
     };
 }

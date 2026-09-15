@@ -54,6 +54,30 @@ public interface IPaymentStore
         DateTimeOffset olderThan,
         CancellationToken cancellationToken);
 
+    Task<(IReadOnlyList<Payment> Items, int Total)> ListStorePaymentsAsync(
+        Guid tenantId,
+        Guid storeId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken);
+
+    Task<(IReadOnlyList<Payment> Items, int Total)> ListAdminPaymentsAsync(
+        int page,
+        int pageSize,
+        Guid? tenantId,
+        Guid? storeId,
+        PaymentStatus? status,
+        bool? requiresReconciliation,
+        CancellationToken cancellationToken);
+
+    Task<string?> GetOrderNumberAsync(Guid orderId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyDictionary<Guid, string>> GetOrderNumbersAsync(
+        IReadOnlyCollection<Guid> orderIds,
+        CancellationToken cancellationToken);
+
+    Task<Guid?> GetStoreTenantIdAsync(Guid storeId, CancellationToken cancellationToken);
+
     void Add(Payment payment);
 
     void Add(PaymentMerchantConfiguration configuration);
@@ -67,6 +91,20 @@ public interface IPaymentStore
     void DiscardPendingProviderEvent(PaymentProviderEvent providerEvent);
 
     void DiscardPendingMerchant(PaymentMerchantConfiguration configuration);
+
+    /// <summary>
+    /// Detaches a payment aggregate graph from the change tracker after a failed concurrent insert,
+    /// without clearing unrelated tracked entities.
+    /// </summary>
+    void DetachPaymentGraph(Payment payment);
+
+    /// <summary>
+    /// After StartAttempt on an existing Payment, ensure only the new attempt remains Added
+    /// so historical attempts are not UPDATE'd (xmin false conflicts).
+    /// </summary>
+    void AcceptHistoricalAttemptsUnchanged(Payment payment, PaymentAttempt newAttempt);
+
+    IDisposable SuspendAutoDetectChanges();
 }
 
 public interface IPaymentSecretProtector

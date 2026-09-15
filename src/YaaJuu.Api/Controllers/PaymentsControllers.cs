@@ -133,3 +133,59 @@ public sealed class BusinessPaymentConfigurationController(
     public async Task<IActionResult> Get(CancellationToken cancellationToken) =>
         this.ToActionResult(await handler.HandleAsync(new GetBusinessPaymentConfigurationQuery(), cancellationToken));
 }
+
+[ApiController]
+[Route("api/v1/business/stores/{storeId:guid}/payments")]
+[Authorize(Policy = AuthorizationPolicies.FranchiseeOwner)]
+[SuppressMessage("csharpsquid", "S6960", Justification = "Business payment list/detail for a store.")]
+public sealed class BusinessPaymentsController(
+    IHandler<ListBusinessPaymentsQuery, Result<PagedResult<BusinessPaymentSummaryDto>>> listHandler,
+    IHandler<GetBusinessPaymentQuery, Result<BusinessPaymentDetailDto>> getHandler) : ControllerBase
+{
+    [HttpGet]
+    [ProducesResponseType(typeof(PagedResult<BusinessPaymentSummaryDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> List(
+        Guid storeId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default) =>
+        this.ToActionResult(await listHandler.HandleAsync(
+            new ListBusinessPaymentsQuery(storeId, page, pageSize), cancellationToken));
+
+    [HttpGet("{paymentId:guid}")]
+    [ProducesResponseType(typeof(BusinessPaymentDetailDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Get(
+        Guid storeId,
+        Guid paymentId,
+        CancellationToken cancellationToken) =>
+        this.ToActionResult(await getHandler.HandleAsync(
+            new GetBusinessPaymentQuery(storeId, paymentId), cancellationToken));
+}
+
+[ApiController]
+[Route("api/v1/admin/payments")]
+[Authorize(Policy = AuthorizationPolicies.PlatformStaff)]
+[SuppressMessage("csharpsquid", "S6960", Justification = "Admin payment list/detail resource.")]
+public sealed class AdminPaymentsController(
+    IHandler<ListAdminPaymentsQuery, Result<PagedResult<AdminPaymentSummaryDto>>> listHandler,
+    IHandler<GetAdminPaymentQuery, Result<AdminPaymentDetailDto>> getHandler) : ControllerBase
+{
+    [HttpGet]
+    [ProducesResponseType(typeof(PagedResult<AdminPaymentSummaryDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> List(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] Guid? tenantId = null,
+        [FromQuery] Guid? storeId = null,
+        [FromQuery] string? status = null,
+        [FromQuery] bool? requiresReconciliation = null,
+        CancellationToken cancellationToken = default) =>
+        this.ToActionResult(await listHandler.HandleAsync(
+            new ListAdminPaymentsQuery(page, pageSize, tenantId, storeId, status, requiresReconciliation),
+            cancellationToken));
+
+    [HttpGet("{paymentId:guid}")]
+    [ProducesResponseType(typeof(AdminPaymentDetailDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Get(Guid paymentId, CancellationToken cancellationToken) =>
+        this.ToActionResult(await getHandler.HandleAsync(new GetAdminPaymentQuery(paymentId), cancellationToken));
+}

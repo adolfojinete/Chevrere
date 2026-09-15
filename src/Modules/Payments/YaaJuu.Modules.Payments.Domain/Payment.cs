@@ -109,7 +109,6 @@ public sealed class Payment : AggregateRoot
             merchantReference,
             utcNow);
         _attempts.Add(attempt);
-        UpdatedAt = utcNow;
         return attempt;
     }
 

@@ -22,6 +22,10 @@ public static class PaymentsApplicationExtensions
         services.AddScoped<IHandler<GetConsumerPaymentQuery, Result<ConsumerPaymentDto>>, GetConsumerPaymentHandler>();
         services.AddScoped<IHandler<GetAdminMerchantQuery, Result<WompiMerchantConfigurationDto>>, GetAdminMerchantHandler>();
         services.AddScoped<IHandler<GetBusinessPaymentConfigurationQuery, Result<BusinessPaymentConfigurationStatusDto>>, GetBusinessPaymentConfigurationHandler>();
+        services.AddScoped<IHandler<ListBusinessPaymentsQuery, Result<PagedResult<BusinessPaymentSummaryDto>>>, ListBusinessPaymentsHandler>();
+        services.AddScoped<IHandler<GetBusinessPaymentQuery, Result<BusinessPaymentDetailDto>>, GetBusinessPaymentHandler>();
+        services.AddScoped<IHandler<ListAdminPaymentsQuery, Result<PagedResult<AdminPaymentSummaryDto>>>, ListAdminPaymentsHandler>();
+        services.AddScoped<IHandler<GetAdminPaymentQuery, Result<AdminPaymentDetailDto>>, GetAdminPaymentHandler>();
         return services;
     }
 }
