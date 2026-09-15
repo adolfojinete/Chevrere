@@ -66,66 +66,39 @@ public sealed class ProviderStatusProcessor(IOrderPaymentLifecycle orders)
         ArgumentNullException.ThrowIfNull(payment);
         ArgumentNullException.ThrowIfNull(attempt);
 
-        if (providerAmount is not null && providerAmount.Value != payment.Amount)
-        {
-            var mismatch = attempt.MarkApproved(
-                providerTransactionId ?? attempt.ProviderTransactionId ?? attempt.MerchantReference,
-                providerRawStatus,
-                utcNow,
-                providerOccurredAt);
-            var recon = payment.MarkRequiresReconciliation(ReconciliationReason.AmountMismatch, utcNow);
-            if (mismatch)
-            {
-                payment.MarkApproved(attempt, utcNow);
-            }
-
-            return new ApplyProviderStatusResult(mismatch, false, recon, null);
-        }
-
-        if (providerCurrency is not null
-            && !string.Equals(providerCurrency, payment.Currency, StringComparison.OrdinalIgnoreCase))
-        {
-            var mismatch = attempt.MarkApproved(
-                providerTransactionId ?? attempt.ProviderTransactionId ?? attempt.MerchantReference,
-                providerRawStatus,
-                utcNow,
-                providerOccurredAt);
-            var recon = payment.MarkRequiresReconciliation(ReconciliationReason.CurrencyMismatch, utcNow);
-            if (mismatch)
-            {
-                payment.MarkApproved(attempt, utcNow);
-            }
-
-            return new ApplyProviderStatusResult(mismatch, false, recon, null);
-        }
-
+        // Status first: never fabricate Approved from amount/currency mismatch alone.
         switch (status)
         {
             case PaymentProviderOutcomeStatus.Pending:
                 {
                     var mutated = attempt.MarkPending(providerTransactionId, providerRawStatus, null, utcNow);
-                    return new ApplyProviderStatusResult(mutated, false, false, null);
+                    var recon = MarkNonApprovedFinancialMismatch(payment, providerAmount, providerCurrency, utcNow);
+                    return new ApplyProviderStatusResult(mutated, false, recon, null);
                 }
             case PaymentProviderOutcomeStatus.Declined:
                 {
                     var mutated = attempt.MarkDeclined(
                         providerTransactionId, providerRawStatus, failureCode, failureMessage, utcNow, providerOccurredAt);
-                    return new ApplyProviderStatusResult(mutated, false, false, null);
+                    var recon = MarkNonApprovedFinancialMismatch(payment, providerAmount, providerCurrency, utcNow);
+                    return new ApplyProviderStatusResult(mutated, false, recon, null);
                 }
             case PaymentProviderOutcomeStatus.Voided:
                 {
                     var mutated = attempt.MarkVoided(providerTransactionId, providerRawStatus, utcNow, providerOccurredAt);
-                    return new ApplyProviderStatusResult(mutated, false, false, null);
+                    var recon = MarkNonApprovedFinancialMismatch(payment, providerAmount, providerCurrency, utcNow);
+                    return new ApplyProviderStatusResult(mutated, false, recon, null);
                 }
             case PaymentProviderOutcomeStatus.Error:
                 {
                     var mutated = attempt.MarkError(failureCode, failureMessage, utcNow);
-                    return new ApplyProviderStatusResult(mutated, false, false, null);
+                    var recon = MarkNonApprovedFinancialMismatch(payment, providerAmount, providerCurrency, utcNow);
+                    return new ApplyProviderStatusResult(mutated, false, recon, null);
                 }
             case PaymentProviderOutcomeStatus.Unknown:
                 {
                     var mutated = attempt.MarkUnknown(providerTransactionId, providerRawStatus, utcNow);
-                    return new ApplyProviderStatusResult(mutated, false, false, null);
+                    var recon = MarkNonApprovedFinancialMismatch(payment, providerAmount, providerCurrency, utcNow);
+                    return new ApplyProviderStatusResult(mutated, false, recon, null);
                 }
             case PaymentProviderOutcomeStatus.Approved:
                 return await ApplyApprovedAsync(
@@ -133,6 +106,8 @@ public sealed class ProviderStatusProcessor(IOrderPaymentLifecycle orders)
                     attempt,
                     providerTransactionId,
                     providerRawStatus,
+                    providerAmount,
+                    providerCurrency,
                     providerOccurredAt,
                     correlationId,
                     utcNow,
@@ -146,11 +121,33 @@ public sealed class ProviderStatusProcessor(IOrderPaymentLifecycle orders)
         }
     }
 
+    private static bool MarkNonApprovedFinancialMismatch(
+        Payment payment,
+        decimal? providerAmount,
+        string? providerCurrency,
+        DateTimeOffset utcNow)
+    {
+        if (providerAmount is not null && providerAmount.Value != payment.Amount)
+        {
+            return payment.MarkRequiresReconciliation(ReconciliationReason.AmountMismatch, utcNow);
+        }
+
+        if (providerCurrency is not null
+            && !string.Equals(providerCurrency, payment.Currency, StringComparison.OrdinalIgnoreCase))
+        {
+            return payment.MarkRequiresReconciliation(ReconciliationReason.CurrencyMismatch, utcNow);
+        }
+
+        return false;
+    }
+
     private async Task<ApplyProviderStatusResult> ApplyApprovedAsync(
         Payment payment,
         PaymentAttempt attempt,
         string? providerTransactionId,
         string? providerRawStatus,
+        decimal? providerAmount,
+        string? providerCurrency,
         DateTimeOffset? providerOccurredAt,
         string correlationId,
         DateTimeOffset utcNow,
@@ -166,6 +163,25 @@ public sealed class ProviderStatusProcessor(IOrderPaymentLifecycle orders)
         var txId = providerTransactionId ?? attempt.ProviderTransactionId!;
         var attemptMutated = attempt.MarkApproved(txId, providerRawStatus, utcNow, providerOccurredAt);
         var paymentMutated = payment.MarkApproved(attempt, utcNow);
+
+        // Authentic Approved preserves external truth; Order confirm requires exact financial match.
+        if (providerAmount is null || string.IsNullOrWhiteSpace(providerCurrency))
+        {
+            var recon = payment.MarkRequiresReconciliation(ReconciliationReason.UnexpectedProviderState, utcNow);
+            return new ApplyProviderStatusResult(attemptMutated, paymentMutated, recon, null);
+        }
+
+        if (providerAmount.Value != payment.Amount)
+        {
+            var recon = payment.MarkRequiresReconciliation(ReconciliationReason.AmountMismatch, utcNow);
+            return new ApplyProviderStatusResult(attemptMutated, paymentMutated, recon, null);
+        }
+
+        if (!string.Equals(providerCurrency, payment.Currency, StringComparison.OrdinalIgnoreCase))
+        {
+            var recon = payment.MarkRequiresReconciliation(ReconciliationReason.CurrencyMismatch, utcNow);
+            return new ApplyProviderStatusResult(attemptMutated, paymentMutated, recon, null);
+        }
 
         var confirm = await orders.ConfirmPaidOrderAsync(
             payment.OrderId,

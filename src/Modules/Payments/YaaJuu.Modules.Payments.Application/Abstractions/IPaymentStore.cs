@@ -27,6 +27,7 @@ public interface IPaymentStore
     Task<PaymentMerchantConfiguration?> GetActiveMerchantAsync(
         Guid tenantId,
         PaymentProvider provider,
+        MerchantEnvironment environment,
         CancellationToken cancellationToken);
 
     Task<PaymentMerchantConfiguration?> GetMerchantByIdAsync(

@@ -10,7 +10,9 @@ namespace YaaJuu.Modules.Payments.Infrastructure.Security;
 /// <summary>
 /// AES-256-GCM authenticated encryption. Ciphertext format:
 /// v1.{keyId}.{base64url(nonce|tag|ciphertext)}
-/// Master key from Payments:SecretsMasterKey / env YAAJUU_PAYMENT_SECRETS_KEY (32 raw bytes or base64).
+/// Master key: standard Base64 encoding exactly 32 cryptographically random bytes
+/// (<c>Payments:SecretsMasterKey</c> / <c>YAAJUU_PAYMENT_SECRETS_KEY</c>).
+/// Development/Testing may use a deterministic fallback only when no key is configured.
 /// </summary>
 public sealed class AesGcmPaymentSecretProtector : IPaymentSecretProtector
 {
@@ -21,10 +23,13 @@ public sealed class AesGcmPaymentSecretProtector : IPaymentSecretProtector
     public AesGcmPaymentSecretProtector(IOptions<PaymentsOptions> options, IHostEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(options);
-        var configured = options.Value.SecretsMasterKey
-                         ?? Environment.GetEnvironmentVariable("YAAJUU_PAYMENT_SECRETS_KEY");
+        ArgumentNullException.ThrowIfNull(environment);
 
-        if (string.IsNullOrWhiteSpace(configured))
+        var configured = FirstNonEmpty(
+            options.Value.SecretsMasterKey,
+            Environment.GetEnvironmentVariable("YAAJUU_PAYMENT_SECRETS_KEY"));
+
+        if (configured is null)
         {
             if (environment.IsEnvironment("Testing") || environment.IsDevelopment())
             {
@@ -36,11 +41,7 @@ public sealed class AesGcmPaymentSecretProtector : IPaymentSecretProtector
                 "Payments secret master key is required (Payments:SecretsMasterKey or YAAJUU_PAYMENT_SECRETS_KEY).");
         }
 
-        _key = DecodeKey(configured);
-        if (_key.Length != 32)
-        {
-            throw new InvalidOperationException("Payments secret master key must decode to 32 bytes.");
-        }
+        _key = DecodeStrictBase64Key(configured);
     }
 
     public string Protect(string plaintext, string purpose)
@@ -93,16 +94,41 @@ public sealed class AesGcmPaymentSecretProtector : IPaymentSecretProtector
         return Encoding.UTF8.GetString(plain);
     }
 
-    private static byte[] DecodeKey(string configured)
+    /// <summary>
+    /// Production contract: standard Base64 decoding to exactly 32 bytes. No padding/truncation.
+    /// </summary>
+    internal static byte[] DecodeStrictBase64Key(string configured)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(configured);
+        var trimmed = configured.Trim();
+        byte[] decoded;
         try
         {
-            return Convert.FromBase64String(configured);
+            decoded = Convert.FromBase64String(trimmed);
         }
-        catch (FormatException)
+        catch (FormatException ex)
         {
-            return Encoding.UTF8.GetBytes(configured.PadRight(32)[..32]);
+            throw new InvalidOperationException(
+                "Payments secret master key must be valid Base64 encoding exactly 32 bytes.", ex);
         }
+
+        if (decoded.Length != 32)
+        {
+            throw new InvalidOperationException(
+                "Payments secret master key must be valid Base64 encoding exactly 32 bytes.");
+        }
+
+        return decoded;
+    }
+
+    private static string? FirstNonEmpty(string? first, string? second)
+    {
+        if (!string.IsNullOrWhiteSpace(first))
+        {
+            return first;
+        }
+
+        return string.IsNullOrWhiteSpace(second) ? null : second;
     }
 
     private static string Base64UrlEncode(byte[] data) =>

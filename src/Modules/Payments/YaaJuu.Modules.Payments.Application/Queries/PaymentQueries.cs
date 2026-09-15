@@ -1,3 +1,4 @@
+using YaaJuu.Modules.Payments.Application;
 using YaaJuu.Modules.Payments.Application.Abstractions;
 using YaaJuu.Modules.Payments.Application.Commands;
 using YaaJuu.Modules.Payments.Application.Contracts;
@@ -67,7 +68,8 @@ public sealed record GetBusinessPaymentConfigurationQuery;
 
 public sealed class GetBusinessPaymentConfigurationHandler(
     IPaymentStore store,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    Microsoft.Extensions.Options.IOptions<PaymentsOptions> options)
     : IHandler<GetBusinessPaymentConfigurationQuery, Result<BusinessPaymentConfigurationStatusDto>>
 {
     public async Task<Result<BusinessPaymentConfigurationStatusDto>> HandleAsync(
@@ -80,17 +82,21 @@ public sealed class GetBusinessPaymentConfigurationHandler(
                 Error.Forbidden("tenant.required", "Tenant context required."));
         }
 
+        var runtimeEnvironment = PaymentRuntimeEnvironment.Resolve(options.Value);
         var active = await store.GetActiveMerchantAsync(
-            currentUser.TenantId.Value, PaymentProvider.Wompi, cancellationToken);
+            currentUser.TenantId.Value, PaymentProvider.Wompi, runtimeEnvironment, cancellationToken);
         if (active is null)
         {
             var any = await store.ListMerchantsForTenantAsync(currentUser.TenantId.Value, cancellationToken);
-            var latest = any.OrderByDescending(m => m.Version).FirstOrDefault();
+            var latestForRuntime = any
+                .Where(m => m.Environment == runtimeEnvironment)
+                .OrderByDescending(m => m.Version)
+                .FirstOrDefault();
             return Result.Success(new BusinessPaymentConfigurationStatusDto(
-                latest is not null,
+                latestForRuntime is not null,
                 false,
-                latest?.Provider.ToString(),
-                latest?.Environment.ToString()));
+                latestForRuntime?.Provider.ToString(),
+                runtimeEnvironment.ToString()));
         }
 
         return Result.Success(new BusinessPaymentConfigurationStatusDto(

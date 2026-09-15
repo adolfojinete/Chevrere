@@ -54,10 +54,14 @@ public sealed class PaymentStore(YaaJuuDbContext dbContext) : IPaymentStore
     public Task<PaymentMerchantConfiguration?> GetActiveMerchantAsync(
         Guid tenantId,
         PaymentProvider provider,
+        MerchantEnvironment environment,
         CancellationToken cancellationToken) =>
         dbContext.PaymentMerchantConfigurations
             .IgnoreQueryFilters()
-            .Where(c => c.TenantId == tenantId && c.Provider == provider && c.IsEnabled)
+            .Where(c => c.TenantId == tenantId
+                        && c.Provider == provider
+                        && c.Environment == environment
+                        && c.IsEnabled)
             .OrderByDescending(c => c.Version)
             .FirstOrDefaultAsync(cancellationToken);
 

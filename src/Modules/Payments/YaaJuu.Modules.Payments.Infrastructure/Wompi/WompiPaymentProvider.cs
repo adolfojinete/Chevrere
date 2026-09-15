@@ -33,11 +33,11 @@ public sealed class WompiPaymentProvider(
             request.Currency,
             request.Secrets.IntegritySecret);
 
-        var checkoutBase = options.Value.Wompi.CheckoutBaseUrl.TrimEnd('/');
+        // Widget MVP: client-safe parameters only. No fabricated checkout URL.
         var action = new PaymentClientAction(
             "Widget",
             request.Secrets.PublicKey,
-            $"{checkoutBase}/{request.MerchantReference}",
+            null,
             request.MerchantReference,
             cents,
             request.Currency,
@@ -125,7 +125,9 @@ public sealed class WompiPaymentProvider(
         using var message = new HttpRequestMessage(
             HttpMethod.Get,
             BuildUrl(request.Environment, $"/transactions/{Uri.EscapeDataString(request.ProviderTransactionId)}"));
-        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", request.Secrets.PublicKey);
+        // Official Wompi Colombia contract: GET /v1/transactions/{id} requires PrivateKey (prv_*).
+        // Public key queries are no longer supported and may return 404.
+        message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", request.Secrets.PrivateKey);
 
         try
         {
@@ -149,12 +151,27 @@ public sealed class WompiPaymentProvider(
         }
     }
 
-    private string BuildUrl(string environment, string path)
+    private string BuildUrl(string environment, string path) =>
+        $"{ResolveBaseUrl(environment, options.Value).TrimEnd('/')}{path}";
+
+    /// <summary>
+    /// Exhaustive environment → base URL mapping. Never falls back to Sandbox for unknown values.
+    /// </summary>
+    internal static string ResolveBaseUrl(string environment, PaymentsOptions opts)
     {
-        var baseUrl = string.Equals(environment, "Production", StringComparison.OrdinalIgnoreCase)
-            ? options.Value.Wompi.ProductionBaseUrl
-            : options.Value.Wompi.SandboxBaseUrl;
-        return $"{baseUrl.TrimEnd('/')}{path}";
+        ArgumentNullException.ThrowIfNull(opts);
+        if (string.Equals(environment, "Production", StringComparison.OrdinalIgnoreCase))
+        {
+            return opts.Wompi.ProductionBaseUrl;
+        }
+
+        if (string.Equals(environment, "Sandbox", StringComparison.OrdinalIgnoreCase))
+        {
+            return opts.Wompi.SandboxBaseUrl;
+        }
+
+        throw new InvalidOperationException(
+            $"Unsupported Wompi merchant environment '{environment}'. Expected Sandbox or Production.");
     }
 
     public static string ComputeIntegritySignature(

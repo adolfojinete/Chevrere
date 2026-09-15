@@ -15,11 +15,15 @@ public sealed class PaymentsOptions
 
 public sealed class WompiOptions
 {
+    /// <summary>
+    /// Platform runtime environment for NEW payments: Sandbox or Production.
+    /// Not client-controlled. Historical attempts retain their own Environment.
+    /// </summary>
+    public string Environment { get; set; } = "Sandbox";
+
     public string SandboxBaseUrl { get; set; } = "https://sandbox.wompi.co/v1";
 
     public string ProductionBaseUrl { get; set; } = "https://production.wompi.co/v1";
-
-    public string CheckoutBaseUrl { get; set; } = "https://checkout.wompi.co/l/";
 
     public int TimeoutSeconds { get; set; } = 30;
 

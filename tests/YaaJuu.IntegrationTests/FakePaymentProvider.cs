@@ -18,7 +18,9 @@ public sealed class FakePaymentProvider : IPaymentProvider
 
     public ConcurrentBag<string> PublicKeysUsed { get; } = [];
 
-    public ConcurrentBag<(decimal Amount, string Currency, string PublicKey, string Reference)> InitializeRequests { get; } = [];
+    public ConcurrentBag<string> EnvironmentsUsed { get; } = [];
+
+    public ConcurrentBag<(decimal Amount, string Currency, string PublicKey, string Reference, string Environment)> InitializeRequests { get; } = [];
 
     public ConcurrentDictionary<string, PaymentProviderTransactionResult> LookupByTransactionId { get; } = new(StringComparer.Ordinal);
 
@@ -27,6 +29,9 @@ public sealed class FakePaymentProvider : IPaymentProvider
 
     /// <summary>Optional gate to serialize/coordinate concurrent initialize calls.</summary>
     public Func<Task>? BeforeInitializeAsync { get; set; }
+
+    /// <summary>When set, GetTransactionAsync throws for the matching provider transaction id (then clears).</summary>
+    public string? ThrowOnLookupTransactionId { get; set; }
 
     public int InitializeCallCount => Volatile.Read(ref _initializeCalls);
 
@@ -42,10 +47,12 @@ public sealed class FakePaymentProvider : IPaymentProvider
         Interlocked.Exchange(ref _cardChargeCalls, 0);
         Interlocked.Exchange(ref _lookupCalls, 0);
         PublicKeysUsed.Clear();
+        EnvironmentsUsed.Clear();
         InitializeRequests.Clear();
         LookupByTransactionId.Clear();
         SimulateInitializeUnknown = false;
         BeforeInitializeAsync = null;
+        ThrowOnLookupTransactionId = null;
     }
 
     public async Task<PaymentProviderInitializeResult> InitializeWidgetAsync(
@@ -60,7 +67,8 @@ public sealed class FakePaymentProvider : IPaymentProvider
 
         Interlocked.Increment(ref _initializeCalls);
         PublicKeysUsed.Add(request.Secrets.PublicKey);
-        InitializeRequests.Add((request.Amount, request.Currency, request.Secrets.PublicKey, request.MerchantReference));
+        EnvironmentsUsed.Add(request.Environment);
+        InitializeRequests.Add((request.Amount, request.Currency, request.Secrets.PublicKey, request.MerchantReference, request.Environment));
 
         if (SimulateInitializeUnknown)
         {
@@ -77,15 +85,18 @@ public sealed class FakePaymentProvider : IPaymentProvider
 
         var money = Money.Create(request.Amount, request.Currency);
         var cents = WompiAmountConverter.ToAmountInCents(money);
+        var signature = WompiContract.ComputeIntegritySignature(
+            request.MerchantReference, cents, request.Currency, request.Secrets.IntegritySecret);
         var txId = $"fake_tx_{Guid.CreateVersion7():N}";
+        // Mirror production Widget contract: client-safe params, no fabricated CheckoutUrl.
         var action = new PaymentClientAction(
             "Widget",
             request.Secrets.PublicKey,
-            $"https://checkout.test/{request.MerchantReference}",
+            null,
             request.MerchantReference,
             cents,
             request.Currency,
-            "test-integrity-signature");
+            signature);
 
         LookupByTransactionId[txId] = new PaymentProviderTransactionResult(
             true,
@@ -118,6 +129,7 @@ public sealed class FakePaymentProvider : IPaymentProvider
         ArgumentNullException.ThrowIfNull(request);
         Interlocked.Increment(ref _cardChargeCalls);
         PublicKeysUsed.Add(request.Secrets.PublicKey);
+        EnvironmentsUsed.Add(request.Environment);
         if (SimulateInitializeUnknown)
         {
             return Task.FromResult(new PaymentProviderTransactionResult(
@@ -158,6 +170,15 @@ public sealed class FakePaymentProvider : IPaymentProvider
         ArgumentNullException.ThrowIfNull(request);
         Interlocked.Increment(ref _lookupCalls);
         PublicKeysUsed.Add(request.Secrets.PublicKey);
+        EnvironmentsUsed.Add(request.Environment);
+
+        if (ThrowOnLookupTransactionId is not null
+            && string.Equals(ThrowOnLookupTransactionId, request.ProviderTransactionId, StringComparison.Ordinal))
+        {
+            ThrowOnLookupTransactionId = null;
+            throw new InvalidOperationException("Simulated unexpected reconciliation failure.");
+        }
+
         if (LookupByTransactionId.TryGetValue(request.ProviderTransactionId, out var known))
         {
             return Task.FromResult(known);

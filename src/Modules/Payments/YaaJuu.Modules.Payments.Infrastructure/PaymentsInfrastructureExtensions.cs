@@ -22,8 +22,9 @@ public static class PaymentsInfrastructureExtensions
             .Validate(
                 o => o.Wompi.TimeoutSeconds > 0
                      && o.Reconciliation.BatchSize is > 0 and <= 500
-                     && o.Reconciliation.PollIntervalSeconds > 0,
-                "Payments options must have positive Wompi timeout and reconciliation settings.")
+                     && o.Reconciliation.PollIntervalSeconds > 0
+                     && PaymentRuntimeEnvironment.IsValid(o.Wompi.Environment),
+                "Payments options must have positive Wompi timeout, reconciliation settings, and Wompi:Environment of Sandbox or Production.")
             .ValidateOnStart();
 
         services.AddScoped<IPaymentStore, PaymentStore>();
@@ -60,6 +61,8 @@ public sealed class PaymentReconciliationWorker(
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
+                var correlation = scope.ServiceProvider.GetRequiredService<YaaJuu.SharedKernel.Context.ICorrelationContext>();
+                correlation.Set($"recon-{Guid.CreateVersion7():N}");
                 var handler = scope.ServiceProvider.GetRequiredService<ReconcilePaymentsHandler>();
                 await handler.RunBatchAsync(stoppingToken);
             }

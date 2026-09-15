@@ -103,11 +103,21 @@ Variables de entorno alternativas:
 Bootstrap__SuperAdmin__Email=admin@yaajuu.local
 Bootstrap__SuperAdmin__Password=...
 Jwt__SigningKey=...
-YAAJUU_PAYMENT_SECRETS_KEY=...   # 32 bytes base64 o clave maestra para AES-GCM de secretos Wompi (no reutilizar JWT)
+YAAJUU_PAYMENT_SECRETS_KEY=...   # Base64 de exactamente 32 bytes aleatorios (AES-256-GCM). No usar password ni pad/truncate. Solo Development/Testing admite fallback sin key.
+Payments__Wompi__Environment=Sandbox   # o Production — decide ambiente operativo de NUEVOS pagos
 Payments__Wompi__DefaultRedirectUrl=https://app.example/payments/return
 ```
 
-Payments multi-comercio: cada Tenant configura sus llaves Wompi vía Admin. Los secretos se almacenan cifrados; GET nunca los devuelve. Detalle: [docs/adr/ADR-011-payments-wompi-multi-merchant.md](docs/adr/ADR-011-payments-wompi-multi-merchant.md).
+Generar master key (ejemplo, no reutilizar el valor en producción):
+
+```powershell
+# 32 bytes cryptographically random → Base64
+[Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+```
+
+El fallback determinista de Development/Testing **no** es configuración productiva. Datos cifrados con ese fallback no deben tratarse como secretos de producción.
+
+Payments multi-comercio: cada Tenant configura sus llaves Wompi (Sandbox y/o Production) vía Admin. El runtime de plataforma (`Payments:Wompi:Environment`) selecciona cuál usar para nuevos pagos; no hay fallback cruzado. Los secretos se almacenan cifrados; GET nunca los devuelve. Widget recibe parámetros client-safe (sin URL de checkout inventada). Detalle: [docs/adr/ADR-011-payments-wompi-multi-merchant.md](docs/adr/ADR-011-payments-wompi-multi-merchant.md).
 
 ## Migraciones
 

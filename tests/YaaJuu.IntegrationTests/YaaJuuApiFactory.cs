@@ -92,6 +92,7 @@ public sealed class YaaJuuApiFactory : WebApplicationFactory<Program>, IAsyncLif
         ["Payments:Enabled"] = "true",
         ["Payments:SecretsMasterKey"] = Convert.ToBase64String(
             System.Security.Cryptography.SHA256.HashData("yaajuu-integration-payment-secrets-v1"u8.ToArray())),
+        ["Payments:Wompi:Environment"] = "Sandbox",
         ["Payments:Wompi:TimeoutSeconds"] = "5",
         ["Payments:Reconciliation:Enabled"] = "false",
         ["Payments:Reconciliation:PollIntervalSeconds"] = "30",

@@ -6,4 +6,8 @@
     <ProjectReference Include="..\YaaJuu.Modules.Payments.Application\YaaJuu.Modules.Payments.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\YaaJuu.Infrastructure\YaaJuu.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="YaaJuu.UnitTests" />
+    <InternalsVisibleTo Include="YaaJuu.IntegrationTests" />
+  </ItemGroup>
 </Project>

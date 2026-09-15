@@ -7,6 +7,7 @@ using YaaJuu.SharedKernel.Context;
 using YaaJuu.SharedKernel.Payments;
 using YaaJuu.SharedKernel.Persistence;
 using YaaJuu.SharedKernel.Time;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace YaaJuu.Modules.Payments.Application.Commands;
@@ -20,13 +21,15 @@ public sealed class ReconcilePaymentsHandler(
     IAuditRecorder audit,
     IUnitOfWork unitOfWork,
     IClock clock,
-    IOptions<PaymentsOptions> options)
+    IOptions<PaymentsOptions> options,
+    ILogger<ReconcilePaymentsHandler> logger)
 {
     public async Task RunBatchAsync(CancellationToken cancellationToken)
     {
         var opts = options.Value.Reconciliation;
         var olderThan = clock.UtcNow.AddSeconds(-opts.MinimumAttemptAgeSeconds);
         var attempts = await store.ListAttemptsForReconciliationAsync(opts.BatchSize, olderThan, cancellationToken);
+        var correlationId = TryGetCorrelationId();
 
         foreach (var attemptRow in attempts)
         {
@@ -35,11 +38,27 @@ public sealed class ReconcilePaymentsHandler(
                 var payment = await store.GetByIdAsync(attemptRow.PaymentId, cancellationToken);
                 if (payment is null)
                 {
+                    logger.LogError(
+                        "Payment reconciliation skipped: payment not found for attempt. PaymentId={PaymentId} AttemptId={AttemptId} CorrelationId={CorrelationId}",
+                        attemptRow.PaymentId,
+                        attemptRow.Id,
+                        correlationId);
                     continue;
                 }
 
                 var attempt = payment.Attempts.FirstOrDefault(a => a.Id == attemptRow.Id);
-                if (attempt is null || string.IsNullOrWhiteSpace(attempt.ProviderTransactionId))
+                if (attempt is null)
+                {
+                    logger.LogError(
+                        "Payment reconciliation skipped: attempt missing from aggregate. PaymentId={PaymentId} AttemptId={AttemptId} CorrelationId={CorrelationId}",
+                        attemptRow.PaymentId,
+                        attemptRow.Id,
+                        correlationId);
+                    continue;
+                }
+
+                // No official lookup-by-reference: without ProviderTransactionId we cannot GET.
+                if (string.IsNullOrWhiteSpace(attempt.ProviderTransactionId))
                 {
                     continue;
                 }
@@ -47,6 +66,12 @@ public sealed class ReconcilePaymentsHandler(
                 var merchant = await store.GetMerchantByIdAsync(attempt.MerchantConfigurationId, cancellationToken);
                 if (merchant is null)
                 {
+                    logger.LogError(
+                        "Payment reconciliation skipped: historical merchant configuration not found. PaymentId={PaymentId} AttemptId={AttemptId} MerchantConfigurationId={MerchantConfigurationId} CorrelationId={CorrelationId}",
+                        payment.Id,
+                        attempt.Id,
+                        attempt.MerchantConfigurationId,
+                        correlationId);
                     continue;
                 }
 
@@ -59,11 +84,20 @@ public sealed class ReconcilePaymentsHandler(
                         secrets.Unprotect(merchant.EncryptedIntegritySecret, PaymentSecretPurposes.WompiIntegritySecret),
                         secrets.Unprotect(merchant.EncryptedEventsSecret, PaymentSecretPurposes.WompiEventsSecret));
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    logger.LogError(
+                        ex,
+                        "Merchant configuration cannot be decrypted for payment reconciliation. PaymentId={PaymentId} AttemptId={AttemptId} MerchantConfigurationId={MerchantConfigurationId} Provider={Provider} CorrelationId={CorrelationId}",
+                        payment.Id,
+                        attempt.Id,
+                        attempt.MerchantConfigurationId,
+                        attempt.Provider,
+                        correlationId);
                     continue;
                 }
 
+                // Historical attempt Environment/config — never runtime Environment.
                 var lookup = await provider.GetTransactionAsync(
                     new PaymentProviderLookupRequest(
                         decrypted,
@@ -89,7 +123,7 @@ public sealed class ReconcilePaymentsHandler(
                     lookup.FailureCode,
                     lookup.FailureMessage,
                     lookup.ProviderOccurredAt,
-                    correlation.CorrelationId,
+                    correlationId ?? Guid.CreateVersion7().ToString("N"),
                     clock.UtcNow,
                     cancellationToken);
 
@@ -115,10 +149,30 @@ public sealed class ReconcilePaymentsHandler(
 
                 await unitOfWork.SaveChangesAsync(cancellationToken);
             }
-            catch (Exception)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // Per-attempt isolation: continue batch.
+                logger.LogError(
+                    ex,
+                    "Unexpected payment reconciliation failure for attempt. PaymentId={PaymentId} AttemptId={AttemptId} Provider={Provider} ProviderTransactionId={ProviderTransactionId} MerchantConfigurationId={MerchantConfigurationId} CorrelationId={CorrelationId}",
+                    attemptRow.PaymentId,
+                    attemptRow.Id,
+                    attemptRow.Provider,
+                    attemptRow.ProviderTransactionId,
+                    attemptRow.MerchantConfigurationId,
+                    correlationId);
             }
+        }
+    }
+
+    private string? TryGetCorrelationId()
+    {
+        try
+        {
+            return correlation.CorrelationId;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
         }
     }
 }

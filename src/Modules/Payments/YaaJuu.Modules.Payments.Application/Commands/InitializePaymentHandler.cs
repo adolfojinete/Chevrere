@@ -101,7 +101,9 @@ public sealed class InitializePaymentHandler(
             return Result.Failure<ConsumerPaymentDto>(gate);
         }
 
-        var merchant = await store.GetActiveMerchantAsync(payable.TenantId, PaymentProvider.Wompi, cancellationToken);
+        var runtimeEnvironment = PaymentRuntimeEnvironment.Resolve(optionsAccessor.Value);
+        var merchant = await store.GetActiveMerchantAsync(
+            payable.TenantId, PaymentProvider.Wompi, runtimeEnvironment, cancellationToken);
         if (merchant is null)
         {
             return Result.Failure<ConsumerPaymentDto>(

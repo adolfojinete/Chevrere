@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-15
-- Wompi docs consulted: 2026-09-14 / 2026-09-15
+- Wompi docs consulted: 2026-09-14 / 2026-09-15; revalidated 2026-09-15 (Hardening 8.2)
 
 ## Context
 
@@ -14,7 +14,7 @@ Introduce bounded context `Payments` (Domain / Application / Infrastructure) wit
 
 - `Payment` (1 per Order) + `PaymentAttempt` (N)
 - Tenant-scoped versioned `PaymentMerchantConfiguration` (Wompi)
-- AES-256-GCM secret protection (`YAAJUU_PAYMENT_SECRETS_KEY` / `Payments:SecretsMasterKey`)
+- AES-256-GCM secret protection. Master key (`YAAJUU_PAYMENT_SECRETS_KEY` / `Payments:SecretsMasterKey`) must be **standard Base64 decoding to exactly 32 bytes**. Weak strings are never padded/truncated into a key. Development/Testing may use a deterministic fallback only when no key is configured.
 - `IPaymentProvider` abstraction; Wompi adapter only in Infrastructure
 - `IOrderPaymentLifecycle` in SharedKernel for Confirm (Orders owns `Order.Confirm`)
 - Webhook `POST /api/v1/webhooks/wompi` with official checksum verification
@@ -36,9 +36,10 @@ Verified:
 - Integrity: SHA256(`reference` + `amount_in_cents` + `currency` + integrity_secret)
 - Webhook checksum: SHA256(concat `signature.properties` values + `timestamp` + events_secret); header `X-Event-Checksum`
 - Statuses: PENDING, APPROVED, DECLINED, VOIDED, ERROR
-- GET `/v1/transactions/{id}` with **public** key. **No official lookup-by-reference**
+- GET `/v1/transactions/{id}` authenticated **server-side with merchant PrivateKey** (`prv_*`). Public-key queries are no longer supported by Wompi and may return 404. **No official lookup-by-reference**
 - Duplicate reference → HTTP 422
-- MVP methods: Widget + CARD token (no PAN/CVV through YaaJuu). PSE/Nequi excluded from MVP.
+- MVP methods: Widget + CARD token (no PAN/CVV through YaaJuu). Widget returns client-safe parameters (`PublicKey`, `Reference`, `AmountInCents`, `Currency`, `IntegritySignature`); **no fabricated checkout URL**. PSE/Nequi excluded from MVP.
+- Platform runtime `Payments:Wompi:Environment` (`Sandbox`|`Production`) selects the active merchant for **new** payments. Historical Attempts retain `MerchantConfigurationId` / `Environment` for webhook and reconciliation.
 
 ### Rejected alternatives
 
@@ -57,12 +58,13 @@ Verified:
 - **No lookup-by-reference**: without `ProviderTransactionId`, crash window leaves Attempt `Unknown`, blocks new charges, and waits for webhook (or later reconciliation once an id exists). Timeout is never treated as Declined.
 - Provider reference uniqueness is enforced locally (`ux_payment_attempts_merchant_reference`) and matches Wompi 422 on duplicate reference.
 - Merchant rotation: historical Attempt keeps `MerchantConfigurationId` V1; new Attempts use active V2; webhook/reconciliation decrypts secrets from the Attempt's configuration.
-- Amount/currency mismatch on authentic Approved webhook: preserve external truth on Attempt/Payment, set `RequiresReconciliation`, do **not** Confirm Order.
+- Amount/currency mismatch: apply **provider status first**. Only authentic `APPROVED` may mark Attempt/Payment Approved. Non-Approved + mismatch never fabricates Approved; may set `RequiresReconciliation`. Approved + mismatch: preserve external approval, set `RequiresReconciliation`, do **not** Confirm Order. Approved without amount/currency: reconciliation, no Confirm.
+- Reconciliation failures (unexpected exceptions, decrypt failure, missing historical merchant) are logged at Error with safe identifiers while preserving per-attempt batch isolation.
 - Automatic refunds, chargebacks, saved cards, PSE/Nequi, master-key rotation UI: future
 
-### Hardening evidence (Phase 8.1)
+### Hardening evidence (Phase 8.1 / 8.2)
 
-IntegrationTests on PostgreSQL/Testcontainers cover multi-merchant routing, webhook signature/dedup/concurrency, same/different idempotency keys, Unknown crash window, reconciliation, late approvals, amount/currency mismatch, inventory absolute boundary (no Commit on Approved), secret encryption-at-rest + API redaction, and DB unique/FK constraints.
+IntegrationTests on PostgreSQL/Testcontainers cover multi-merchant routing, webhook signature/dedup/concurrency, same/different idempotency keys, Unknown crash window, reconciliation, late approvals, amount/currency mismatch (including non-Approved mismatch safety), inventory absolute boundary (no Commit on Approved), secret encryption-at-rest + API redaction, DB unique/FK constraints, PrivateKey lookup auth, explicit runtime Environment selection, Widget client-safe contract, and reconciliation observability.
 
 ## Consequences
 
