@@ -30,7 +30,8 @@ YaaJuu
 │       ├── Inventory    (Domain / Application / Infrastructure)
 │       ├── Procurement  (Domain / Application / Infrastructure)
 │       ├── Consumer     (Domain / Application / Infrastructure)
-│       └── Orders       (Domain / Application / Infrastructure)
+│       ├── Orders       (Domain / Application / Infrastructure)
+│       └── Payments     (Domain / Application / Infrastructure)
 ├── tests
 │   ├── YaaJuu.UnitTests
 │   ├── YaaJuu.IntegrationTests
@@ -102,7 +103,11 @@ Variables de entorno alternativas:
 Bootstrap__SuperAdmin__Email=admin@yaajuu.local
 Bootstrap__SuperAdmin__Password=...
 Jwt__SigningKey=...
+YAAJUU_PAYMENT_SECRETS_KEY=...   # 32 bytes base64 o clave maestra para AES-GCM de secretos Wompi (no reutilizar JWT)
+Payments__Wompi__DefaultRedirectUrl=https://app.example/payments/return
 ```
+
+Payments multi-comercio: cada Tenant configura sus llaves Wompi vía Admin. Los secretos se almacenan cifrados; GET nunca los devuelve. Detalle: [docs/adr/ADR-011-payments-wompi-multi-merchant.md](docs/adr/ADR-011-payments-wompi-multi-merchant.md).
 
 ## Migraciones
 

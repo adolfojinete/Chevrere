@@ -12,6 +12,7 @@ public static class IdempotencyOperations
     public const string ProcurementPurchaseOrderCreate = "procurement.purchase_order.create";
     public const string ProcurementReceive = "procurement.receive";
     public const string OrdersCreate = "orders.create";
+    public const string PaymentsInitialize = "payments.initialize";
 }
 
 public static class IdempotencyKeyRules

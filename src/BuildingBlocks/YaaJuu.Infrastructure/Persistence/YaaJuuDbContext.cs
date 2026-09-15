@@ -4,6 +4,7 @@ using YaaJuu.Modules.Catalog.Domain;
 using YaaJuu.Modules.Consumer.Domain;
 using YaaJuu.Modules.Inventory.Domain;
 using YaaJuu.Modules.Orders.Domain;
+using YaaJuu.Modules.Payments.Domain;
 using YaaJuu.Modules.Pricing.Domain;
 using YaaJuu.Modules.Procurement.Domain;
 using YaaJuu.Modules.Subscriptions.Domain;
@@ -58,6 +59,14 @@ public sealed class YaaJuuDbContext(
 
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
 
+    public DbSet<PaymentMerchantConfiguration> PaymentMerchantConfigurations => Set<PaymentMerchantConfiguration>();
+
+    public DbSet<Payment> Payments => Set<Payment>();
+
+    public DbSet<PaymentAttempt> PaymentAttempts => Set<PaymentAttempt>();
+
+    public DbSet<PaymentProviderEvent> PaymentProviderEvents => Set<PaymentProviderEvent>();
+
     public DbSet<Supplier> Suppliers => Set<Supplier>();
 
     public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
@@ -102,6 +111,9 @@ public sealed class YaaJuuDbContext(
         builder.Entity<GoodsReceipt>().HasQueryFilter(r => BypassTenantFilter || r.TenantId == FilterTenantId);
         builder.Entity<GoodsReceiptItem>().HasQueryFilter(i => BypassTenantFilter || i.TenantId == FilterTenantId);
         builder.Entity<StoreServiceArea>().HasQueryFilter(a => BypassTenantFilter || a.TenantId == FilterTenantId);
+        builder.Entity<PaymentMerchantConfiguration>().HasQueryFilter(c => BypassTenantFilter || c.TenantId == FilterTenantId);
+        builder.Entity<Payment>().HasQueryFilter(p => BypassTenantFilter || p.TenantId == FilterTenantId);
+        // Attempts/events are resolved via Payment/MerchantConfiguration; no tenant filter on child rows.
 
         // Document numbers are drawn outside the transaction so retries never reuse a number.
         builder.HasSequence<long>("procurement_purchase_order_number_seq").StartsAt(1).IncrementsBy(1);

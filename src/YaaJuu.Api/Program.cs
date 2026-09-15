@@ -11,6 +11,7 @@ using YaaJuu.Modules.Consumer.Infrastructure;
 using YaaJuu.Modules.Identity.Infrastructure;
 using YaaJuu.Modules.Inventory.Infrastructure;
 using YaaJuu.Modules.Orders.Infrastructure;
+using YaaJuu.Modules.Payments.Infrastructure;
 using YaaJuu.Modules.Pricing.Infrastructure;
 using YaaJuu.Modules.Procurement.Infrastructure;
 using YaaJuu.Modules.Subscriptions.Infrastructure;
@@ -93,6 +94,7 @@ try
     builder.Services.AddProcurementModule();
     builder.Services.AddConsumerModule();
     builder.Services.AddOrdersModule(builder.Configuration);
+    builder.Services.AddPaymentsModule(builder.Configuration);
 
     var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
         ?? throw new InvalidOperationException("Jwt configuration is missing.");
